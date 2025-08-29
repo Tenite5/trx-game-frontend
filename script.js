@@ -131,7 +131,37 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('username');
             window.location.href = 'index.html';
         });
-        depositButton.addEventListener('click', () => alert("Deposit function coming soon!")); // Placeholder
+
+        // --- NEW: Deposit Functionality ---
+        depositButton.addEventListener('click', async () => {
+          const token = localStorage.getItem('token');
+          if (!token) {
+            alert("You must be logged in to deposit.");
+            return;
+          }
+
+          try {
+            const response = await fetch(`${API_URL}/test-deposit`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+              alert(data.message);
+              fetchBalance(token); // Update the balance display after a successful deposit
+            } else {
+              alert(`Deposit failed: ${data.message}`);
+            }
+          } catch (error) {
+            console.error('Frontend deposit error:', error);
+            alert('Network error. Could not deposit.');
+          }
+        });
+        
         withdrawButton.addEventListener('click', () => alert("Withdrawal function coming soon!")); // Placeholder
     }
 
