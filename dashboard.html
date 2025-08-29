@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRX Game - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>TRX Game Dashboard</h1>
+        <p class="welcome-message">Welcome, <span id="username-display"></span>!</p>
+
+        <div class="balance-info">
+            <p>Your Balance: <span id="balance-display">Loading...</span> TRX</p>
+        </div>
+
+        <div class="action-buttons">
+            <button id="queue-button">Queue for Game</button>
+            <button id="deposit-button">Deposit</button>
+            <button id="withdraw-button">Withdraw</button>
+        </div>
+
+        <div id="status-message" class="message"></div>
+        <div id="game-results" style="display: none;">
+            <h3>Game Result</h3>
+            <p>Status: <span id="game-status"></span></p>
+            <p>Opponent: <span id="opponent-name"></span></p>
+            <p>Winner: <span id="winner-name"></span></p>
+            <button id="refresh-button" style="display: none;">Check Again</button>
+        </div>
+
+        <button id="logout-button">Logout</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
