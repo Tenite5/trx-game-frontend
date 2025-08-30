@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logout-button');
     const depositButton = document.getElementById('deposit-button');
     const withdrawButton = document.getElementById('withdraw-button');
-    
+
     // Game results
     const gameResultsSection = document.getElementById('game-results');
     const gameStatusDisplay = document.getElementById('game-status');
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await response.json();
                 if (response.ok && data.paymentUrl) {
-                    window.open(data.paymentUrl, '_blank'); // Open OxaPay page
+                    window.open(data.paymentUrl, '_blank');
                 } else {
                     alert(`Deposit failed: ${data.message || 'No payment URL returned'}`);
                 }
