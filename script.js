@@ -242,3 +242,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function showGameResults(matchData, token) {
         gameResultsSection.style.display = 'block';
         gameStatusDisplay.textContent = 'Completed';
+        opponentNameDisplay.textContent =
+            matchData.player1 === localStorage.getItem('username') ? matchData.player2 : matchData.player1;
+       
