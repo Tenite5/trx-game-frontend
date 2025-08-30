@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const balanceDisplay = document.getElementById('balance-display');
     const statusMessage = document.getElementById('status-message');
     const queueButton = document.getElementById('queue-button');
+    const cancelQueueButton = document.getElementById('cancel-queue-button');
     const logoutButton = document.getElementById('logout-button');
     const depositButton = document.getElementById('deposit-button');
     const withdrawButton = document.getElementById('withdraw-button');
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const winnerNameDisplay = document.getElementById('winner-name');
 
     const API_URL = 'https://trx-game-backend.onrender.com/api';
+    let queueInterval = null;
 
     if (document.body.contains(usernameDisplay)) {
         initDashboard();
@@ -115,6 +117,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         queueButton.addEventListener('click', () => queueForGame(token));
 
+        cancelQueueButton?.addEventListener('click', async () => {
+            if (queueInterval) clearInterval(queueInterval);
+            try {
+                const response = await fetch(`${API_URL}/cancel-queue`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                statusMessage.textContent = data.message;
+                statusMessage.style.color = 'orange';
+            } catch (err) {
+                console.error('Cancel queue error:', err);
+                statusMessage.textContent = 'Failed to cancel queue.';
+                statusMessage.style.color = 'red';
+            }
+        });
+
         logoutButton.addEventListener('click', () => {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
@@ -203,38 +222,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
-            if (response.ok) {
+            if (!response.ok) {
                 statusMessage.textContent = data.message;
-                statusMessage.style.color = 'green';
+                statusMessage.style.color = 'red';
                 fetchBalance(token);
+                return;
+            }
 
-                if (data.status === 'queued') {
-                    let checkCount = 0, maxChecks = 10;
-                    const interval = setInterval(async () => {
-                        if (checkCount >= maxChecks) {
-                            clearInterval(interval);
-                            statusMessage.textContent = 'Still in queue. Check back later.';
-                            return;
-                        }
+            statusMessage.textContent = data.message;
+            statusMessage.style.color = 'green';
+
+            if (data.status === 'queued') {
+                let checkCount = 0, maxChecks = 60; // 5 min max
+                queueInterval = setInterval(async () => {
+                    checkCount++;
+                    try {
                         const matchResponse = await fetch(`${API_URL}/match-status/${data.gameId}`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
                         const matchData = await matchResponse.json();
+
                         if (matchData.status === 'completed') {
-                            clearInterval(interval);
+                            clearInterval(queueInterval);
+                            queueInterval = null;
                             showGameResults(matchData, token);
                         } else {
-                            statusMessage.textContent = `Still in queue... (${checkCount + 1}/${maxChecks})`;
+                            statusMessage.textContent = `Still in queue... (${checkCount * 5}s elapsed)`;
                         }
-                        checkCount++;
-                    }, 5000);
-                } else showGameResults(data, token);
+
+                        if (checkCount >= maxChecks) {
+                            clearInterval(queueInterval);
+                            queueInterval = null;
+                            statusMessage.textContent = 'Still in queue. Try canceling or wait.';
+                        }
+                    } catch (err) {
+                        console.error('Queue polling error:', err);
+                        clearInterval(queueInterval);
+                        queueInterval = null;
+                        statusMessage.textContent = 'Error checking match status.';
+                        statusMessage.style.color = 'red';
+                    }
+                }, 5000);
             } else {
-                statusMessage.textContent = data.message;
-                statusMessage.style.color = 'red';
-                fetchBalance(token);
+                showGameResults(data, token);
             }
-        } catch {
+        } catch (err) {
+            console.error('Queue error:', err);
             statusMessage.textContent = 'Network error. Could not join queue.';
             statusMessage.style.color = 'red';
         }
@@ -250,9 +283,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (matchData.winner === localStorage.getItem('username')) {
             gameResultsSection.style.borderColor = 'green';
             statusMessage.textContent = 'You won the match!';
+            statusMessage.style.color = 'green';
         } else {
             gameResultsSection.style.borderColor = 'red';
             statusMessage.textContent = 'You lost the match.';
+            statusMessage.style.color = 'red';
         }
 
         fetchBalance(token);
