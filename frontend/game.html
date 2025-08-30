@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRX Game - Voronoi Hex</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+            max-width: 700px;
+            width: 90%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .game-info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #007bff;
+        }
+
+        .game-info p {
+            margin: 5px 0;
+            font-weight: 500;
+        }
+
+        .turn-indicator {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .your-turn {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .opponent-turn {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .game-board {
+            position: relative;
+            width: 500px;
+            height: 500px;
+            margin: 20px auto;
+            border: 3px solid #333;
+            border-radius: 10px;
+            background: white;
+        }
+
+        .voronoi-cell {
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            stroke: #333;
+            stroke-width: 2;
+            fill: #f8f9fa;
+        }
+
+        .voronoi-cell:hover:not(.claimed) {
+            fill: #e9ecef;
+            stroke-width: 3;
+        }
+
+        .voronoi-cell.player1 {
+            fill: #e74c3c;
+            opacity: 0.8;
+        }
+
+        .voronoi-cell.player2 {
+            fill: #3498db;
+            opacity: 0.8;
+        }
+
+        .voronoi-cell.disabled {
+            cursor: not-allowed;
+        }
+
+        .hex-rules {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: left;
+        }
+
+        .hex-rules h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+
+        .side-indicators {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .player1-sides {
+            color: #e74c3c;
+        }
+
+        .player2-sides {
+            color: #3498db;
+        }
+
+        .status-message {
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .waiting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .game-over {
+            background: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+
+        .action-buttons {
+            margin-top: 20px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background 0.2s ease;
+        }
+
+        button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .back-to-dashboard {
+            background: #28a745;
+        }
+
+        .back-to-dashboard:hover {
+            background: #1e7e34;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .game-result {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .winner {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+        }
+
+        .loser {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+        }
+
+        .draw {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Voronoi Hex Battle</h1>
+        
+        <div class="game-info">
+            <p><strong>Player 1:</strong> <span id="player1-name">Loading...</span> (Red)</p>
+            <p><strong>Player 2:</strong> <span id="player2-name">Waiting...</span> (Blue)</p>
+            <p><strong>Stake:</strong> 10 TRX</p>
+            <p><strong>Your Color:</strong> <span id="your-color">-</span></p>
+        </div>
+
+        <div class="side-indicators">
+            <div class="player1-sides">Player 1: Top ↔ Bottom</div>
+            <div class="player2-sides">Player 2: Left ↔ Right</div>
+        </div>
+
+        <div class="hex-rules">
+            <h3>How to Play</h3>
+            <ul>
+                <li><strong>Goal:</strong> Connect your assigned sides with a continuous chain</li>
+                <li><strong>Player 1 (Red):</strong> Connect TOP to BOTTOM</li>
+                <li><strong>Player 2 (Blue):</strong> Connect LEFT to RIGHT</li>
+                <li><strong>Rules:</strong> Click to claim cells, first to connect wins!</li>
+                <li><strong>Draw:</strong> If board fills without winner, last player to move loses</li>
+            </ul>
+        </div>
+
+        <div class="turn-indicator" id="turn-indicator">
+            <div class="loading"></div>
+            Loading game...
+        </div>
+
+        <div class="game-board">
+            <svg width="500" height="500" id="game-svg">
+                <!-- Voronoi cells will be generated here -->
+            </svg>
+        </div>
+
+        <div class="status-message waiting" id="status-message">
+            Connecting to game...
+        </div>
+
+        <div class="action-buttons">
+            <button id="refresh-game" onclick="refreshGame()">Refresh</button>
+            <button class="back-to-dashboard" onclick="goToDashboard()">Back to Dashboard</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://trx-game-backend.onrender.com/api';
+        const gameId = new URLSearchParams(window.location.search).get('gameId');
+        const token = localStorage.getItem('token');
+        
+        let gameData = {};
+        let gameInterval = null;
+        let voronoiCells = [];
+        let adjacencyMap = {};
+
+        // Check authentication
+        if (!token || !gameId) {
+            alert('Invalid game session. Redirecting to dashboard.');
+            window.location.href = 'dashboard.html';
+        }
+
+        // Generate symmetric Voronoi diagram
+        function generateSymmetricVoronoi() {
+            const width = 500;
+            const height = 500;
+            const margin = 50;
+            
+            // Generate random points in one quadrant, then mirror
+            const basePoints = [];
+            for (let i = 0; i < 4; i++) {
+                basePoints.push({
+                    x: margin + Math.random() * (width/2 - 2*margin),
+                    y: margin + Math.random() * (height/2 - 2*margin)
+                });
+            }
+            
+            // Mirror points to create symmetry
+            const allPoints = [];
+            basePoints.forEach((point, index) => {
+                // Original quadrant
+                allPoints.push({ ...point, id: `cell-${allPoints.length}` });
+                // Mirror horizontally
+                allPoints.push({ x: width - point.x, y: point.y, id: `cell-${allPoints.length}` });
+                // Mirror vertically
+                allPoints.push({ x: point.x, y: height - point.y, id: `cell-${allPoints.length}` });
+                // Mirror both ways
+                allPoints.push({ x: width - point.x, y: height - point.y, id: `cell-${allPoints.length}` });
+            });
+            
+            return createVoronoiCells(allPoints, width, height);
+        }
+
+        function createVoronoiCells(points, width, height) {
+            const cells = [];
+            
+            // Simple approach: create irregular polygons around each point
+            points.forEach((point, index) => {
+                const sides = 3 + Math.floor(Math.random() * 5); // 3-7 sides
+                const baseRadius = 40 + Math.random() * 40; // Variable size
+                const vertices = [];
+                
+                for (let i = 0; i < sides; i++) {
+                    const angle = (i / sides) * 2 * Math.PI + (Math.random() - 0.5) * 0.5;
+                    const radius = baseRadius * (0.7 + Math.random() * 0.6);
+                    vertices.push({
+                        x: point.x + Math.cos(angle) * radius,
+                        y: point.y + Math.sin(angle) * radius
+                    });
+                }
+                
+                // Ensure vertices stay within bounds
+                vertices.forEach(vertex => {
+                    vertex.x = Math.max(10, Math.min(width - 10, vertex.x));
+                    vertex.y = Math.max(10, Math.min(height - 10, vertex.y));
+                });
+                
+                cells.push({
+                    id: index,
+                    center: point,
+                    vertices,
+                    claimed: false,
+                    player: null
+                });
+            });
+            
+            return cells;
+        }
+
+        function renderVoronoiBoard() {
+            const svg = document.getElementById('game-svg');
+            svg.innerHTML = '';
+            
+            // Generate cells if not already done
+            if (voronoiCells.length === 0) {
+                voronoiCells = generateSymmetricVoronoi();
+                buildAdjacencyMap();
+            }
+            
+            // Render each cell
+            voronoiCells.forEach((cell, index) => {
+                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                
+                const points = cell.vertices.map(v => `${v.x},${v.y}`).join(' ');
+                polygon.setAttribute('points', points);
+                polygon.setAttribute('class', 'voronoi-cell');
+                polygon.setAttribute('data-cell-id', index);
+                
+                // Apply player colors
+                if (gameData.board && gameData.board[index]) {
+                    polygon.classList.add(gameData.board[index] === 'X' ? 'player1' : 'player2');
+                    polygon.classList.add('claimed');
+                }
+                
+                // Add click handler
+                polygon.addEventListener('click', () => makeMove(index));
+                
+                svg.appendChild(polygon);
+            });
+        }
+
+        function buildAdjacencyMap() {
+            adjacencyMap = {};
+            
+            voronoiCells.forEach((cell, index) => {
+                adjacencyMap[index] = [];
+                
+                voronoiCells.forEach((otherCell, otherIndex) => {
+                    if (index !== otherIndex && cellsAreAdjacent(cell, otherCell)) {
+                        adjacencyMap[index].push(otherIndex);
+                    }
+                });
+            });
+        }
+
+        function cellsAreAdjacent(cell1, cell2) {
+            // Simple distance-based adjacency for now
+            const dx = cell1.center.x - cell2.center.x;
+            const dy = cell1.center.y - cell2.center.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < 120; // Adjust threshold as needed
+        }
+
+        function checkWinner(board) {
+            // Check if Player 1 (X) connects top to bottom
+            const topCells = voronoiCells
+                .map((cell, index) => ({ index, y: cell.center.y }))
+                .filter(item => item.y < 100 && board[item.index] === 'X')
+                .map(item => item.index);
+            
+            const bottomCells = voronoiCells
+                .map((cell, index) => ({ index, y: cell.center.y }))
+                .filter(item => item.y > 400 && board[item.index] === 'X')
+                .map(item => item.index);
+            
+            if (hasPath(topCells, bottomCells, 'X', board)) {
+                return 'X';
+            }
+            
+            // Check if Player 2 (O) connects left to right
+            const leftCells = voronoiCells
+                .map((cell, index) => ({ index, x: cell.center.x }))
+                .filter(item => item.x < 100 && board[item.index] === 'O')
+                .map(item => item.index);
+            
+            const rightCells = voronoiCells
+                .map((cell, index) => ({ index, x: cell.center.x }))
+                .filter(item => item.x > 400 && board[item.index] === 'O')
+                .map(item => item.index);
+            
+            if (hasPath(leftCells, rightCells, 'O', board)) {
+                return 'O';
+            }
+            
+            // Check for draw (board full)
+            if (board.every(cell => cell !== '')) {
+                return 'draw';
+            }
+            
+            return null;
+        }
+
+        function hasPath(startCells, endCells, player, board) {
+            const visited = new Set();
+            const queue = [...startCells];
+            
+            while (queue.length > 0) {
+                const current = queue.shift();
+                
+                if (visited.has(current)) continue;
+                visited.add(current);
+                
+                if (endCells.includes(current)) {
+                    return true;
+                }
+                
+                // Add adjacent cells of same player
+                const neighbors = adjacencyMap[current] || [];
+                neighbors.forEach(neighbor => {
+                    if (board[neighbor] === player && !visited.has(neighbor)) {
+                        queue.push(neighbor);
+                    }
+                });
+            }
+            
+            return false;
+        }
+
+        // Initialize game
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGame();
+            startGamePolling();
+            renderVoronoiBoard();
+        });
+
+        async function loadGame() {
+            try {
+                const response = await fetch(`${API_URL}/game/${gameId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load game');
+                }
+                
+                const data = await response.json();
+                gameData = data;
+                updateGameDisplay();
+            } catch (error) {
+                console.error('Load game error:', error);
+                document.getElementById('status-message').textContent = 'Failed to load game. Please refresh.';
+                document.getElementById('status-message').className = 'status-message error';
+            }
+        }
+
+        function updateGameDisplay() {
+            // Update player names
+            document.getElementById('player1-name').textContent = gameData.player1 || 'Loading...';
+            document.getElementById('player2-name').textContent = gameData.player2 || 'Waiting for opponent...';
+            document.getElementById('your-color').textContent = gameData.yourSymbol === 'X' ? 'Red (Top↔Bottom)' : 'Blue (Left↔Right)';
+            
+            // Re-render board with current state
+            renderVoronoiBoard();
+            
+            // Update turn indicator and status
+            updateTurnIndicator();
+            updateGameStatus();
+        }
+
+        function updateTurnIndicator() {
+            const indicator = document.getElementById('turn-indicator');
+            
+            if (gameData.status === 'queued') {
+                indicator.innerHTML = '<div class="loading"></div>Waiting for opponent...';
+                indicator.className = 'turn-indicator waiting';
+            } else if (gameData.status === 'in_progress') {
+                if (gameData.isYourTurn) {
+                    indicator.textContent = `Your turn! (${gameData.yourSymbol === 'X' ? 'Red' : 'Blue'})`;
+                    indicator.className = 'turn-indicator your-turn';
+                } else {
+                    indicator.textContent = `${gameData.currentPlayer}'s turn...`;
+                    indicator.className = 'turn-indicator opponent-turn';
+                }
+            } else if (gameData.status === 'completed') {
+                indicator.textContent = 'Game Over';
+                indicator.className = 'turn-indicator game-over';
+            }
+        }
+
+        function updateGameStatus() {
+            const statusElement = document.getElementById('status-message');
+            
+            if (gameData.status === 'queued') {
+                statusElement.textContent = 'Waiting for opponent to join...';
+                statusElement.className = 'status-message waiting';
+            } else if (gameData.status === 'in_progress') {
+                if (gameData.isYourTurn) {
+                    statusElement.textContent = 'Your turn! Click on an empty cell to claim it.';
+                    statusElement.className = 'status-message success';
+                } else {
+                    statusElement.textContent = 'Waiting for opponent\'s move...';
+                    statusElement.className = 'status-message waiting';
+                }
+            } else if (gameData.status === 'completed') {
+                showGameResult();
+            }
+        }
+
+        function showGameResult() {
+            const statusElement = document.getElementById('status-message');
+            const currentUser = localStorage.getItem('username');
+            
+            let resultClass = '';
+            let resultText = '';
+            
+            if (gameData.winner === currentUser) {
+                resultClass = 'winner';
+                resultText = 'Congratulations! You connected your sides and won 19.5 TRX!';
+            } else if (gameData.winner && gameData.winner !== currentUser) {
+                resultClass = 'loser';
+                resultText = 'You lost this round. Your opponent connected their sides first.';
+            } else {
+                resultClass = 'draw';
+                resultText = 'Draw! The last player to move loses. Your stakes have been handled accordingly.';
+            }
+            
+            statusElement.innerHTML = `<div class="game-result ${resultClass}">${resultText}</div>`;
+            
+            // Stop polling
+            if (gameInterval) {
+                clearInterval(gameInterval);
+                gameInterval = null;
+            }
+        }
+
+        async function makeMove(position) {
+            if (!gameData.isYourTurn || gameData.status !== 'in_progress') {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/game/${gameId}/move`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ position })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message);
+                }
+                
+                const data = await response.json();
+                
+                // Update game data with response
+                gameData.board = data.board;
+                gameData.status = data.status;
+                gameData.isYourTurn = data.isYourTurn;
+                
+                if (data.winner) {
+                    if (data.winner === 'draw') {
+                        gameData.winner = null;
+                    } else {
+                        gameData.winner = data.winner === gameData.yourSymbol ? 
+                            localStorage.getItem('username') : 
+                            (gameData.yourSymbol === 'X' ? gameData.player2 : gameData.player1);
+                    }
+                }
+                
+                updateGameDisplay();
+                
+            } catch (error) {
+                console.error('Move error:', error);
+                alert('Failed to make move: ' + error.message);
+            }
+        }
+
+        function startGamePolling() {
+            // Poll every 2 seconds for game updates
+            gameInterval = setInterval(() => {
+                if (gameData.status !== 'completed') {
+                    loadGame();
+                } else {
+                    clearInterval(gameInterval);
+                    gameInterval = null;
+                }
+            }, 2000);
+        }
+
+        function refreshGame() {
+            loadGame();
+        }
+
+        function goToDashboard() {
+            if (gameInterval) {
+                clearInterval(gameInterval);
+                gameInterval = null;
+            }
+            window.location.href = 'dashboard.html';
+        }
+
+        // Clean up interval when page is closed
+        window.addEventListener('beforeunload', () => {
+            if (gameInterval) {
+                clearInterval(gameInterval);
+            }
+        });
+    </script>
+</body>
+</html>

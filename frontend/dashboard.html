@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRX Game - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .game-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .game-rules {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .game-rules h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        
+        .queue-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        
+        .queue-waiting {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .queue-found {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .action-buttons button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        .balance-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        
+        .balance-info p {
+            margin: 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 TRX Tic Tac Toe Arena</h1>
+        <p class="welcome-message">Welcome back, <span id="username-display"></span>!</p>
+
+        <div class="balance-info">
+            <p>💰 Your Balance: <span id="balance-display">Loading...</span> TRX</p>
+        </div>
+
+        <div class="game-info">
+            <h3>🎯 Ready to Play?</h3>
+            <p>Stake: <strong>10 TRX</strong> per game</p>
+            <p>Winner takes: <strong>19.5 TRX</strong> (2.5% platform fee)</p>
+            <p>Game: <strong>Tic Tac Toe</strong> - Best strategy wins!</p>
+        </div>
+
+        <div class="game-rules">
+            <h3>📋 How It Works</h3>
+            <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
+                <li>Click "Queue for Game" to join the matchmaking pool</li>
+                <li>You'll be matched with another player automatically</li>
+                <li>Play Tic Tac Toe - get 3 in a row to win!</li>
+                <li>Winner gets 19.5 TRX, ties refund both players</li>
+                <li>Make sure you have at least 10 TRX to play</li>
+            </ul>
+        </div>
+
+        <div class="action-buttons">
+            <button id="queue-button">🎲 Queue for Game</button>
+            <button id="cancel-queue-button">❌ Cancel Queue</button>
+            <button id="deposit-button">💳 Deposit TRX</button>
+            <button id="withdraw-button">💸 Withdraw TRX</button>
+        </div>
+
+        <div id="status-message" class="message"></div>
+        
+        <div id="game-results" style="display: none;">
+            <h3>🏆 Last Game Result</h3>
+            <p>Status: <span id="game-status"></span></p>
+            <p>Opponent: <span id="opponent-name"></span></p>
+            <p>Winner: <span id="winner-name"></span></p>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+            <button id="logout-button" style="background: #dc3545;">🚪 Logout</button>
+        </div>
+
+        <div style="margin-top: 20px; font-size: 12px; color: #6c757d; text-align: center;">
+            <p>⚠️ This is a skill-based game, not gambling. Play responsibly!</p>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
