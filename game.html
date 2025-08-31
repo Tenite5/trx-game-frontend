@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TRX Game - Voronoi Hex</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -251,8 +250,8 @@
         </div>
 
         <div class="side-indicators">
-            <div class="player1-sides">Player 1: Top ↔ Bottom</div>
-            <div class="player2-sides">Player 2: Left ↔ Right</div>
+            <div class="player1-sides">Player 1: Top ↓ Bottom</div>
+            <div class="player2-sides">Player 2: Left → Right</div>
         </div>
 
         <div class="hex-rules">
@@ -273,7 +272,7 @@
 
         <div class="game-board">
             <svg width="500" height="500" id="game-svg">
-                <!-- Voronoi cells will be generated here -->
+                <!-- Voronoi cells will be rendered here from backend data -->
             </svg>
         </div>
 
@@ -296,7 +295,7 @@
         let gameInterval = null;
         let voronoiCells = [];
         let adjacencyMap = {};
-        let boardGenerated = false;
+        let edgeCells = {};
 
         // Check authentication
         if (!token || !gameId) {
@@ -304,256 +303,30 @@
             window.location.href = 'dashboard.html';
         }
 
-        // Generate symmetric Voronoi diagram with more exotic shapes
-        function generateSymmetricVoronoi() {
-            const width = 500;
-            const height = 500;
-            const basePoints = [];
-            
-            // Create more irregular distribution for exotic shapes
-            const clusters = [
-                { x: width/4, y: height/6, count: 3, spread: 80 },
-                { x: width/6, y: height/3, count: 2, spread: 60 },
-                { x: width/3, y: height/4, count: 4, spread: 90 },
-                { x: width/5, y: height/2.5, count: 2, spread: 50 },
-                { x: width/2.5, y: height/5, count: 3, spread: 70 }
-            ];
-            
-            clusters.forEach(cluster => {
-                for (let i = 0; i < cluster.count; i++) {
-                    // Use polar coordinates for more irregular placement
-                    const angle = (i / cluster.count) * 2 * Math.PI + (Math.random() - 0.5) * Math.PI;
-                    const radius = Math.random() * cluster.spread;
-                    
-                    const x = cluster.x + Math.cos(angle) * radius;
-                    const y = cluster.y + Math.sin(angle) * radius;
-                    
-                    basePoints.push([
-                        Math.max(15, Math.min(width/2 - 15, x)),
-                        Math.max(15, Math.min(height/2 - 15, y))
-                    ]);
-                }
-            });
-            
-            // Add some completely random points for more chaos
-            for (let i = 0; i < 3; i++) {
-                basePoints.push([
-                    Math.random() * (width/2 - 30) + 15,
-                    Math.random() * (height/2 - 30) + 15
-                ]);
-            }
-            
-            // Mirror points to create full symmetry
-            const allPoints = [];
-            basePoints.forEach(point => {
-                const x = point[0], y = point[1];
-                allPoints.push([x, y]);                           // Original
-                allPoints.push([width - x, y]);                  // Horizontal mirror
-                allPoints.push([x, height - y]);                 // Vertical mirror  
-                allPoints.push([width - x, height - y]);         // Both mirrors
-            });
-
-            // Add boundary points to ensure complete coverage
-            const boundaryPoints = [
-                [5, 5], [width/2, 5], [width-5, 5],
-                [5, height/2], [width-5, height/2],
-                [5, height-5], [width/2, height-5], [width-5, height-5]
-            ];
-            allPoints.push(...boundaryPoints);
-
-            // Create Delaunay triangulation and Voronoi diagram
-            const delaunay = d3.Delaunay.from(allPoints);
-            const voronoi = delaunay.voronoi([0, 0, width, height]);
-            
-            const cells = [];
-            for (let i = 0; i < allPoints.length; i++) {
-                const cell = voronoi.cellPolygon(i);
-                if (cell && cell.length >= 3) {
-                    const area = calculatePolygonArea(cell);
-                    
-                    // Keep most cells, only filter out extremely small ones
-                    if (area > 50) {
-                        cells.push({
-                            id: cells.length,
-                            center: { x: allPoints[i][0], y: allPoints[i][1] },
-                            vertices: cell.map(v => ({ x: v[0], y: v[1] })),
-                            claimed: false,
-                            player: null
-                        });
-                    }
-                }
-            }
-            
-            console.log(`Generated ${cells.length} exotic cells`);
-            return cells;
-        }
-
-        function calculatePolygonArea(vertices) {
-            let area = 0;
-            for (let i = 0; i < vertices.length; i++) {
-                const j = (i + 1) % vertices.length;
-                area += vertices[i][0] * vertices[j][1];
-                area -= vertices[j][0] * vertices[i][1];
-            }
-            return Math.abs(area) / 2;
-        }
-
-        function buildAdjacencyMap() {
-            adjacencyMap = {};
-            console.log(`Building precise adjacency map for ${voronoiCells.length} cells`);
-            
-            voronoiCells.forEach((cell, index) => {
-                adjacencyMap[index] = [];
-                
-                voronoiCells.forEach((otherCell, otherIndex) => {
-                    if (index !== otherIndex) {
-                        if (cellsShareActualEdge(cell, otherCell)) {
-                            adjacencyMap[index].push(otherIndex);
-                        }
-                    }
-                });
-            });
-            
-            console.log('Precise adjacency map built:', adjacencyMap);
-        }
-
-        function cellsShareActualEdge(cell1, cell2) {
-            // Find shared edge segments between two cells
-            const sharedSegments = [];
-            const tolerance = 3; // Very tight tolerance for shared vertices
-            
-            // For each edge of cell1, check if it overlaps with any edge of cell2
-            for (let i = 0; i < cell1.vertices.length; i++) {
-                const v1a = cell1.vertices[i];
-                const v1b = cell1.vertices[(i + 1) % cell1.vertices.length];
-                
-                for (let j = 0; j < cell2.vertices.length; j++) {
-                    const v2a = cell2.vertices[j];
-                    const v2b = cell2.vertices[(j + 1) % cell2.vertices.length];
-                    
-                    // Check if edges overlap
-                    const overlap = getLineSegmentOverlap(v1a, v1b, v2a, v2b, tolerance);
-                    if (overlap && overlap.length > 5) { // Require meaningful overlap length
-                        sharedSegments.push(overlap);
-                    }
-                }
-            }
-            
-            // Cells are adjacent if they share at least one significant edge segment
-            const hasSharedEdge = sharedSegments.length > 0;
-            
-            if (hasSharedEdge) {
-                const totalSharedLength = sharedSegments.reduce((sum, seg) => sum + seg.length, 0);
-                console.log(`Cells ${cell1.id} and ${cell2.id} share ${totalSharedLength.toFixed(1)}px of edge`);
-            }
-            
-            return hasSharedEdge;
-        }
-
-        function getLineSegmentOverlap(p1, p2, p3, p4, tolerance) {
-            // Check if line segments (p1,p2) and (p3,p4) overlap
-            // Return null if no overlap, or object with overlap length if they do
-            
-            // Check if the lines are close enough to be considered the same
-            if (!linesAreClose(p1, p2, p3, p4, tolerance)) {
-                return null;
-            }
-            
-            // Project points onto the line to find overlap
-            const line1Start = 0;
-            const line1End = getDistance(p1.x, p1.y, p2.x, p2.y);
-            
-            // Project p3 and p4 onto the line from p1 to p2
-            const proj3 = projectPointOntoLine(p3, p1, p2);
-            const proj4 = projectPointOntoLine(p4, p1, p2);
-            
-            const line2Start = Math.min(proj3, proj4);
-            const line2End = Math.max(proj3, proj4);
-            
-            // Find overlap
-            const overlapStart = Math.max(line1Start, line2Start);
-            const overlapEnd = Math.min(line1End, line2End);
-            
-            if (overlapStart < overlapEnd) {
-                return { length: overlapEnd - overlapStart };
-            }
-            
-            return null;
-        }
-
-        function linesAreClose(p1, p2, p3, p4, tolerance) {
-            // Check if two line segments are close enough to be considered adjacent
-            const dist1 = distanceFromPointToLineSegment(p3, p1, p2);
-            const dist2 = distanceFromPointToLineSegment(p4, p1, p2);
-            const dist3 = distanceFromPointToLineSegment(p1, p3, p4);
-            const dist4 = distanceFromPointToLineSegment(p2, p3, p4);
-            
-            return (dist1 <= tolerance && dist2 <= tolerance) || 
-                   (dist3 <= tolerance && dist4 <= tolerance);
-        }
-
-        function projectPointOntoLine(point, lineStart, lineEnd) {
-            const A = point.x - lineStart.x;
-            const B = point.y - lineStart.y;
-            const C = lineEnd.x - lineStart.x;
-            const D = lineEnd.y - lineStart.y;
-            
-            const dot = A * C + B * D;
-            const lenSq = C * C + D * D;
-            
-            if (lenSq === 0) return 0;
-            
-            const param = dot / lenSq;
-            return param * Math.sqrt(lenSq);
-        }
-
-        function distanceFromPointToLineSegment(point, lineStart, lineEnd) {
-            const A = point.x - lineStart.x;
-            const B = point.y - lineStart.y;
-            const C = lineEnd.x - lineStart.x;
-            const D = lineEnd.y - lineStart.y;
-            
-            const dot = A * C + B * D;
-            const lenSq = C * C + D * D;
-            
-            if (lenSq === 0) {
-                return Math.sqrt(A * A + B * B);
-            }
-            
-            let param = dot / lenSq;
-            
-            let xx, yy;
-            if (param < 0) {
-                xx = lineStart.x;
-                yy = lineStart.y;
-            } else if (param > 1) {
-                xx = lineEnd.x;
-                yy = lineEnd.y;
-            } else {
-                xx = lineStart.x + param * C;
-                yy = lineStart.y + param * D;
-            }
-            
-            const dx = point.x - xx;
-            const dy = point.y - yy;
-            return Math.sqrt(dx * dx + dy * dy);
-        }
-
-        function getDistance(x1, y1, x2, y2) {
-            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-        }
-
+        // Use board layout from backend instead of generating our own
         function renderVoronoiBoard() {
             const svg = document.getElementById('game-svg');
             svg.innerHTML = '';
             
-            // Generate cells if not already done
-            if (!boardGenerated) {
-                voronoiCells = generateSymmetricVoronoi();
-                buildAdjacencyMap();
-                boardGenerated = true;
-                initializeBoard(); // Initialize backend board
+            // Wait for board layout from backend
+            if (!gameData.boardLayout || !gameData.boardLayout.cells || gameData.boardLayout.cells.length === 0) {
+                console.log('Waiting for board layout from backend...');
+                return;
             }
+            
+            voronoiCells = gameData.boardLayout.cells;
+            adjacencyMap = {};
+            
+            // Convert adjacency map from backend format
+            if (gameData.boardLayout.adjacencyMap) {
+                for (const [key, value] of Object.entries(gameData.boardLayout.adjacencyMap)) {
+                    adjacencyMap[key] = value;
+                }
+            }
+            
+            edgeCells = gameData.boardLayout.edgeCells || {};
+            
+            console.log(`Rendering ${voronoiCells.length} cells from backend`);
             
             // Render each cell
             voronoiCells.forEach((cell, index) => {
@@ -564,7 +337,7 @@
                 polygon.setAttribute('class', 'voronoi-cell');
                 polygon.setAttribute('data-cell-id', index);
                 
-                // Apply player colors
+                // Apply player colors based on game state
                 if (gameData.board && gameData.board[index]) {
                     polygon.classList.add(gameData.board[index] === 'X' ? 'player1' : 'player2');
                     polygon.classList.add('claimed');
@@ -580,142 +353,80 @@
                 
                 svg.appendChild(polygon);
             });
+            
+            // Add visual indicators for edge cells
+            addEdgeIndicators();
         }
 
-        // Initialize board layout on backend
-        async function initializeBoard() {
-            try {
-                // Build edge cells based on actual positions
-                const edgeCells = {
-                    top: [],
-                    bottom: [],
-                    left: [],
-                    right: []
-                };
-                
-                const edgeThreshold = 50;
-                voronoiCells.forEach((cell, index) => {
-                    if (cell.center.y < edgeThreshold) edgeCells.top.push(index);
-                    if (cell.center.y > 450) edgeCells.bottom.push(index);
-                    if (cell.center.x < edgeThreshold) edgeCells.left.push(index);
-                    if (cell.center.x > 450) edgeCells.right.push(index);
-                });
-                
-                console.log('Edge cells:', edgeCells);
-                console.log('Board size:', voronoiCells.length);
-                
-                // Send board layout to server
-                const response = await fetch(`${API_URL}/game/${gameId}/init-board`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        boardSize: voronoiCells.length,
-                        edgeCells,
-                        adjacencyMap
-                    })
-                });
-                
-                if (!response.ok) {
-                    console.error('Failed to initialize board on backend');
-                }
-            } catch (error) {
-                console.error('Failed to initialize board:', error);
-            }
-        }
-
-        function checkWinner(board) {
-            if (!board || board.length === 0) return null;
+        function addEdgeIndicators() {
+            const svg = document.getElementById('game-svg');
             
-            // Define edge cells dynamically based on actual cell positions
-            const topCells = [];
-            const bottomCells = [];
-            const leftCells = [];
-            const rightCells = [];
-            
-            const edgeThreshold = 50; // Distance from edge to be considered an edge cell
-            
-            voronoiCells.forEach((cell, index) => {
-                if (cell.center.y < edgeThreshold) topCells.push(index);
-                if (cell.center.y > 450) bottomCells.push(index);
-                if (cell.center.x < edgeThreshold) leftCells.push(index);
-                if (cell.center.x > 450) rightCells.push(index);
-            });
-            
-            // Check if Player 1 (X) connects top to bottom
-            const topXCells = topCells.filter(i => board[i] === 'X');
-            const bottomXCells = bottomCells.filter(i => board[i] === 'X');
-            
-            if (topXCells.length > 0 && bottomXCells.length > 0) {
-                if (hasPath(topXCells, bottomXCells, 'X', board)) {
-                    console.log('Player X wins by connecting top to bottom!');
-                    return 'X';
-                }
-            }
-            
-            // Check if Player 2 (O) connects left to right
-            const leftOCells = leftCells.filter(i => board[i] === 'O');
-            const rightOCells = rightCells.filter(i => board[i] === 'O');
-            
-            if (leftOCells.length > 0 && rightOCells.length > 0) {
-                if (hasPath(leftOCells, rightOCells, 'O', board)) {
-                    console.log('Player O wins by connecting left to right!');
-                    return 'O';
-                }
-            }
-            
-            // Check for draw (board full)
-            if (board.every(cell => cell !== '')) {
-                console.log('Board is full - draw!');
-                return 'draw';
-            }
-            
-            return null;
-        }
-
-        function hasPath(startCells, endCells, player, board) {
-            if (!adjacencyMap || Object.keys(adjacencyMap).length === 0) {
-                console.warn('Adjacency map not built yet');
-                return false;
-            }
-            
-            const visited = new Set();
-            const queue = [...startCells];
-            
-            console.log(`Checking path for ${player} from cells [${startCells}] to cells [${endCells}]`);
-            
-            while (queue.length > 0) {
-                const current = queue.shift();
-                
-                if (visited.has(current)) continue;
-                visited.add(current);
-                
-                // Check if we've reached any end cell
-                if (endCells.includes(current)) {
-                    console.log(`Path found! ${player} connected through cell ${current}`);
-                    return true;
-                }
-                
-                // Add adjacent cells of same player
-                const neighbors = adjacencyMap[current] || [];
-                neighbors.forEach(neighbor => {
-                    if (board[neighbor] === player && !visited.has(neighbor)) {
-                        queue.push(neighbor);
+            // Add subtle edge indicators
+            if (edgeCells.top) {
+                edgeCells.top.forEach(cellIndex => {
+                    const cell = voronoiCells[cellIndex];
+                    if (cell && !gameData.board[cellIndex]) {
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', cell.center.x);
+                        circle.setAttribute('cy', cell.center.y - 15);
+                        circle.setAttribute('r', 3);
+                        circle.setAttribute('fill', '#e74c3c');
+                        circle.setAttribute('opacity', '0.5');
+                        svg.appendChild(circle);
                     }
                 });
             }
             
-            console.log(`No path found for ${player}`);
-            return false;
+            if (edgeCells.bottom) {
+                edgeCells.bottom.forEach(cellIndex => {
+                    const cell = voronoiCells[cellIndex];
+                    if (cell && !gameData.board[cellIndex]) {
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', cell.center.x);
+                        circle.setAttribute('cy', cell.center.y + 15);
+                        circle.setAttribute('r', 3);
+                        circle.setAttribute('fill', '#e74c3c');
+                        circle.setAttribute('opacity', '0.5');
+                        svg.appendChild(circle);
+                    }
+                });
+            }
+            
+            if (edgeCells.left) {
+                edgeCells.left.forEach(cellIndex => {
+                    const cell = voronoiCells[cellIndex];
+                    if (cell && !gameData.board[cellIndex]) {
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', cell.center.x - 15);
+                        circle.setAttribute('cy', cell.center.y);
+                        circle.setAttribute('r', 3);
+                        circle.setAttribute('fill', '#3498db');
+                        circle.setAttribute('opacity', '0.5');
+                        svg.appendChild(circle);
+                    }
+                });
+            }
+            
+            if (edgeCells.right) {
+                edgeCells.right.forEach(cellIndex => {
+                    const cell = voronoiCells[cellIndex];
+                    if (cell && !gameData.board[cellIndex]) {
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', cell.center.x + 15);
+                        circle.setAttribute('cy', cell.center.y);
+                        circle.setAttribute('r', 3);
+                        circle.setAttribute('fill', '#3498db');
+                        circle.setAttribute('opacity', '0.5');
+                        svg.appendChild(circle);
+                    }
+                });
+            }
         }
 
         // Initialize game
         document.addEventListener('DOMContentLoaded', () => {
             loadGame();
             startGamePolling();
-            renderVoronoiBoard();
         });
 
         async function loadGame() {
@@ -742,9 +453,9 @@
             // Update player names
             document.getElementById('player1-name').textContent = gameData.player1 || 'Loading...';
             document.getElementById('player2-name').textContent = gameData.player2 || 'Waiting for opponent...';
-            document.getElementById('your-color').textContent = gameData.yourSymbol === 'X' ? 'Red (Top↔Bottom)' : 'Blue (Left↔Right)';
+            document.getElementById('your-color').textContent = gameData.yourSymbol === 'X' ? 'Red (Top↓Bottom)' : 'Blue (Left→Right)';
             
-            // Re-render board with current state
+            // Render board with backend layout
             renderVoronoiBoard();
             
             // Update turn indicator and status
@@ -823,6 +534,11 @@
                 return;
             }
             
+            // Check if cell is already claimed
+            if (gameData.board && gameData.board[position] !== '') {
+                return;
+            }
+            
             try {
                 const response = await fetch(`${API_URL}/game/${gameId}/move`, {
                     method: 'POST',
@@ -889,10 +605,9 @@
             if (gameData.status === 'in_progress') {
                 const shouldForfeit = confirm('Leaving will forfeit the game and you will lose. Are you sure?');
                 if (!shouldForfeit) {
-                    return; // Don't leave if user cancels
+                    return;
                 }
                 
-                // Send forfeit request
                 forfeitGame().then(() => {
                     window.location.href = 'dashboard.html';
                 });
@@ -914,13 +629,12 @@
             }
         }
 
-        // Also handle page close/refresh
+        // Handle page close/refresh
         window.addEventListener('beforeunload', (e) => {
             if (gameData.status === 'in_progress') {
                 e.preventDefault();
                 e.returnValue = 'Leaving will forfeit the game and you will lose. Are you sure?';
                 
-                // Send forfeit in background (may not always work due to browser limitations)
                 navigator.sendBeacon(`${API_URL}/game/${gameId}/forfeit`, JSON.stringify({}));
             }
             
