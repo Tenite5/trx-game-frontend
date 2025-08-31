@@ -30,14 +30,23 @@ const GameSchema = new mongoose.Schema({
   stake: { type: Number, required: true },
   status: { type: String, enum: ['queued', 'in_progress', 'completed'], default: 'queued' },
   winner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  board: { type: [String], default: Array(16).fill('') }, // 16-cell Voronoi board
+  board: { type: [String], default: [] }, // Dynamic size based on generated cells
+  boardSize: { type: Number, default: 0 }, // Track actual board size
   currentPlayer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   player1Symbol: { type: String, default: 'X' },
   player2Symbol: { type: String, default: 'O' },
   createdAt: { type: Date, default: Date.now },
   lastMoveAt: { type: Date, default: Date.now },
-  lastMovePlayer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Track who made the last move for draw condition
-  moveCount: { type: Number, default: 0 }, // Track total moves for draw detection
+  lastMovePlayer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  moveCount: { type: Number, default: 0 },
+  // Store board layout info for win detection
+  edgeCells: {
+    top: { type: [Number], default: [] },
+    bottom: { type: [Number], default: [] },
+    left: { type: [Number], default: [] },
+    right: { type: [Number], default: [] }
+  },
+  adjacencyMap: { type: Map, default: new Map() }
 });
 const Game = mongoose.model('Game', GameSchema);
 
@@ -53,36 +62,9 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-/* -------------------- VORONOI HEX GAME LOGIC -------------------- */
+/* -------------------- DYNAMIC VORONOI HEX GAME LOGIC -------------------- */
 
-// Predefined adjacency map for 16-cell Voronoi board
-// This represents which cells are adjacent to each other
-const ADJACENCY_MAP = {
-  0: [1, 4, 5],
-  1: [0, 2, 4, 5, 6],
-  2: [1, 3, 5, 6, 7],
-  3: [2, 6, 7],
-  4: [0, 1, 8, 9],
-  5: [0, 1, 2, 8, 9, 10],
-  6: [1, 2, 3, 9, 10, 11],
-  7: [2, 3, 10, 11],
-  8: [4, 5, 12, 13],
-  9: [4, 5, 6, 12, 13, 14],
-  10: [5, 6, 7, 13, 14, 15],
-  11: [6, 7, 14, 15],
-  12: [8, 9],
-  13: [8, 9, 10],
-  14: [9, 10, 11],
-  15: [10, 11]
-};
-
-// Define edge cells for connection checking
-const TOP_CELLS = [0, 1, 2, 3];
-const BOTTOM_CELLS = [12, 13, 14, 15];
-const LEFT_CELLS = [0, 4, 8, 12];
-const RIGHT_CELLS = [3, 7, 11, 15];
-
-function hasPath(startCells, endCells, player, board) {
+function hasPath(startCells, endCells, player, board, adjacencyMap) {
   const visited = new Set();
   const queue = [];
   
@@ -105,7 +87,7 @@ function hasPath(startCells, endCells, player, board) {
     }
     
     // Add adjacent cells of the same player
-    const neighbors = ADJACENCY_MAP[current] || [];
+    const neighbors = adjacencyMap.get(current.toString()) || [];
     neighbors.forEach(neighbor => {
       if (board[neighbor] === player && !visited.has(neighbor)) {
         queue.push(neighbor);
@@ -116,15 +98,27 @@ function hasPath(startCells, endCells, player, board) {
   return false;
 }
 
-const checkWinner = (board, moveCount) => {
+const checkWinner = (board, edgeCells, adjacencyMap) => {
+  if (!board || board.length === 0) return null;
+  
   // Check if Player 1 (X) connects top to bottom
-  if (hasPath(TOP_CELLS, BOTTOM_CELLS, 'X', board)) {
-    return 'X';
+  const topXCells = edgeCells.top.filter(i => board[i] === 'X');
+  const bottomXCells = edgeCells.bottom.filter(i => board[i] === 'X');
+  
+  if (topXCells.length > 0 && bottomXCells.length > 0) {
+    if (hasPath(topXCells, bottomXCells, 'X', board, adjacencyMap)) {
+      return 'X';
+    }
   }
   
   // Check if Player 2 (O) connects left to right
-  if (hasPath(LEFT_CELLS, RIGHT_CELLS, 'O', board)) {
-    return 'O';
+  const leftOCells = edgeCells.left.filter(i => board[i] === 'O');
+  const rightOCells = edgeCells.right.filter(i => board[i] === 'O');
+  
+  if (leftOCells.length > 0 && rightOCells.length > 0) {
+    if (hasPath(leftOCells, rightOCells, 'O', board, adjacencyMap)) {
+      return 'O';
+    }
   }
   
   // Check for draw (board full)
@@ -196,7 +190,7 @@ app.post('/api/queue', authenticateToken, async (req, res) => {
     if (opponentGame) {
       opponentGame.player2 = user._id;
       opponentGame.status = 'in_progress';
-      opponentGame.currentPlayer = opponentGame.player1; // player1 goes first
+      opponentGame.currentPlayer = opponentGame.player1;
       await opponentGame.save();
 
       const opponent = await User.findById(opponentGame.player1);
@@ -206,7 +200,7 @@ app.post('/api/queue', authenticateToken, async (req, res) => {
         gameId: opponentGame._id,
         status: 'in_progress',
         opponent: opponent.username,
-        yourSymbol: 'O', // second player gets O
+        yourSymbol: 'O',
         currentPlayer: opponent.username
       });
     } else {
@@ -228,13 +222,48 @@ app.post('/api/queue', authenticateToken, async (req, res) => {
   }
 });
 
+// Initialize board layout (called by frontend when board is generated)
+app.post('/api/game/:gameId/init-board', authenticateToken, async (req, res) => {
+  const { boardSize, edgeCells, adjacencyMap } = req.body;
+  
+  try {
+    const game = await Game.findById(req.params.gameId);
+    if (!game) return res.status(404).json({ message: 'Game not found.' });
+    
+    const userId = req.user.userId;
+    if (!game.player1.equals(userId) && (!game.player2 || !game.player2.equals(userId))) {
+      return res.status(403).json({ message: 'You are not part of this game.' });
+    }
+
+    // Initialize the board with the correct size
+    if (game.boardSize === 0) {
+      game.board = Array(boardSize).fill('');
+      game.boardSize = boardSize;
+      game.edgeCells = edgeCells;
+      
+      // Convert adjacency map to MongoDB Map format
+      const mongoMap = new Map();
+      for (const [key, value] of Object.entries(adjacencyMap)) {
+        mongoMap.set(key, value);
+      }
+      game.adjacencyMap = mongoMap;
+      
+      await game.save();
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Init board error:', error);
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
+
 // Get game state
 app.get('/api/game/:gameId', authenticateToken, async (req, res) => {
   try {
     const game = await Game.findById(req.params.gameId).populate('player1 player2 winner currentPlayer');
     if (!game) return res.status(404).json({ message: 'Game not found.' });
     
-    // Check if user is part of this game
     const userId = req.user.userId;
     if (!game.player1._id.equals(userId) && (!game.player2 || !game.player2._id.equals(userId))) {
       return res.status(403).json({ message: 'You are not part of this game.' });
@@ -247,6 +276,7 @@ app.get('/api/game/:gameId', authenticateToken, async (req, res) => {
       gameId: game._id,
       status: game.status,
       board: game.board,
+      boardSize: game.boardSize,
       player1: game.player1.username,
       player2: game.player2?.username || null,
       yourSymbol,
@@ -274,7 +304,7 @@ app.post('/api/game/:gameId/move', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Not your turn.' });
     }
     
-    if (position < 0 || position > 15 || game.board[position] !== '') {
+    if (position < 0 || position >= game.board.length || game.board[position] !== '') {
       return res.status(400).json({ message: 'Invalid move.' });
     }
     
@@ -287,7 +317,7 @@ app.post('/api/game/:gameId/move', authenticateToken, async (req, res) => {
     game.moveCount += 1;
     
     // Check for winner
-    const winner = checkWinner(game.board, game.moveCount);
+    const winner = checkWinner(game.board, game.edgeCells, game.adjacencyMap);
     if (winner) {
       game.status = 'completed';
       if (winner === 'draw') {
@@ -334,7 +364,6 @@ app.post('/api/cancel-queue', authenticateToken, async (req, res) => {
   try {
     const game = await Game.findOne({ status: 'queued', player1: req.user.userId });
     if (game) {
-      // Refund the player
       const user = await User.findById(req.user.userId);
       user.trx_balance += game.stake;
       await user.save();
@@ -347,7 +376,7 @@ app.post('/api/cancel-queue', authenticateToken, async (req, res) => {
   }
 });
 
-// Match status (updated for new flow)
+// Match status
 app.get('/api/match-status/:gameId', authenticateToken, async (req, res) => {
   try {
     const game = await Game.findById(req.params.gameId).populate('player1 player2 winner');

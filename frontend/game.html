@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TRX Game - Voronoi Hex</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -75,7 +76,6 @@
         }
 
         .voronoi-cell {
-            position: absolute;
             cursor: pointer;
             transition: all 0.2s ease;
             stroke: #333;
@@ -296,6 +296,7 @@
         let gameInterval = null;
         let voronoiCells = [];
         let adjacencyMap = {};
+        let boardGenerated = false;
 
         // Check authentication
         if (!token || !gameId) {
@@ -303,71 +304,155 @@
             window.location.href = 'dashboard.html';
         }
 
-        // Generate symmetric Voronoi diagram
+        // Generate symmetric Voronoi diagram using D3
         function generateSymmetricVoronoi() {
             const width = 500;
             const height = 500;
-            const margin = 50;
-            
-            // Generate random points in one quadrant, then mirror
+            const numPoints = 20; // Generate 20 points in one quadrant = 80 total points
             const basePoints = [];
-            for (let i = 0; i < 4; i++) {
-                basePoints.push({
-                    x: margin + Math.random() * (width/2 - 2*margin),
-                    y: margin + Math.random() * (height/2 - 2*margin)
-                });
+            
+            // Generate random points in one quadrant with varying densities
+            for (let i = 0; i < numPoints; i++) {
+                // Create clusters and sparse areas for more variety
+                const clusterCenter = {
+                    x: Math.random() * (width / 2 - 40) + 20,
+                    y: Math.random() * (height / 2 - 40) + 20
+                };
+                
+                // Add some clustering effect
+                const clusterOffset = Math.random() * 30;
+                const angle = Math.random() * 2 * Math.PI;
+                
+                basePoints.push([
+                    Math.max(20, Math.min(width/2 - 20, clusterCenter.x + Math.cos(angle) * clusterOffset)),
+                    Math.max(20, Math.min(height/2 - 20, clusterCenter.y + Math.sin(angle) * clusterOffset))
+                ]);
             }
             
-            // Mirror points to create symmetry
+            // Mirror points to create full symmetry
             const allPoints = [];
-            basePoints.forEach((point, index) => {
-                // Original quadrant
-                allPoints.push({ ...point, id: `cell-${allPoints.length}` });
-                // Mirror horizontally
-                allPoints.push({ x: width - point.x, y: point.y, id: `cell-${allPoints.length}` });
-                // Mirror vertically
-                allPoints.push({ x: point.x, y: height - point.y, id: `cell-${allPoints.length}` });
-                // Mirror both ways
-                allPoints.push({ x: width - point.x, y: height - point.y, id: `cell-${allPoints.length}` });
+            basePoints.forEach(point => {
+                const x = point[0], y = point[1];
+                // Add all 4 mirror positions
+                allPoints.push([x, y]);                           // Original
+                allPoints.push([width - x, y]);                  // Horizontal mirror
+                allPoints.push([x, height - y]);                 // Vertical mirror  
+                allPoints.push([width - x, height - y]);         // Both mirrors
             });
+
+            // Create Delaunay triangulation and Voronoi diagram
+            const delaunay = d3.Delaunay.from(allPoints);
+            const voronoi = delaunay.voronoi([0, 0, width, height]);
             
-            return createVoronoiCells(allPoints, width, height);
+            const cells = [];
+            for (let i = 0; i < allPoints.length; i++) {
+                const cell = voronoi.cellPolygon(i);
+                if (cell && cell.length >= 3 && cell.length <= 7) { // Only keep cells with 3-7 sides
+                    // Calculate cell area to filter by size
+                    const area = calculatePolygonArea(cell);
+                    const avgArea = (width * height) / allPoints.length;
+                    
+                    // Keep cells that are between 0.5x and 2.5x average size
+                    if (area > avgArea * 0.5 && area < avgArea * 2.5) {
+                        cells.push({
+                            id: cells.length, // Reindex to be sequential
+                            center: { x: allPoints[i][0], y: allPoints[i][1] },
+                            vertices: cell.map(v => ({ x: v[0], y: v[1] })),
+                            claimed: false,
+                            player: null
+                        });
+                    }
+                }
+            }
+            
+            // Ensure we have at least 16 cells for the game
+            if (cells.length < 16) {
+                console.warn(`Only generated ${cells.length} valid cells, regenerating...`);
+                return generateSymmetricVoronoi(); // Try again
+            }
+            
+            return cells.slice(0, Math.min(64, cells.length)); // Cap at 64 cells for performance
         }
 
-        function createVoronoiCells(points, width, height) {
-            const cells = [];
+        function calculatePolygonArea(vertices) {
+            let area = 0;
+            for (let i = 0; i < vertices.length; i++) {
+                const j = (i + 1) % vertices.length;
+                area += vertices[i][0] * vertices[j][1];
+                area -= vertices[j][0] * vertices[i][1];
+            }
+            return Math.abs(area) / 2;
+        }
+
+        function buildAdjacencyMap() {
+            adjacencyMap = {};
+            console.log(`Building adjacency map for ${voronoiCells.length} cells`);
             
-            // Simple approach: create irregular polygons around each point
-            points.forEach((point, index) => {
-                const sides = 3 + Math.floor(Math.random() * 5); // 3-7 sides
-                const baseRadius = 40 + Math.random() * 40; // Variable size
-                const vertices = [];
+            voronoiCells.forEach((cell, index) => {
+                adjacencyMap[index] = [];
                 
-                for (let i = 0; i < sides; i++) {
-                    const angle = (i / sides) * 2 * Math.PI + (Math.random() - 0.5) * 0.5;
-                    const radius = baseRadius * (0.7 + Math.random() * 0.6);
-                    vertices.push({
-                        x: point.x + Math.cos(angle) * radius,
-                        y: point.y + Math.sin(angle) * radius
-                    });
-                }
-                
-                // Ensure vertices stay within bounds
-                vertices.forEach(vertex => {
-                    vertex.x = Math.max(10, Math.min(width - 10, vertex.x));
-                    vertex.y = Math.max(10, Math.min(height - 10, vertex.y));
-                });
-                
-                cells.push({
-                    id: index,
-                    center: point,
-                    vertices,
-                    claimed: false,
-                    player: null
+                voronoiCells.forEach((otherCell, otherIndex) => {
+                    if (index !== otherIndex) {
+                        // Check if cells share an edge or are very close
+                        if (cellsShareEdge(cell, otherCell)) {
+                            adjacencyMap[index].push(otherIndex);
+                        }
+                    }
                 });
             });
             
-            return cells;
+            // Debug output
+            console.log('Adjacency map built:', adjacencyMap);
+            
+            // Ensure every cell has at least one neighbor (fallback)
+            voronoiCells.forEach((cell, index) => {
+                if (adjacencyMap[index].length === 0) {
+                    // Find closest cell as neighbor
+                    let closest = null;
+                    let closestDist = Infinity;
+                    
+                    voronoiCells.forEach((otherCell, otherIndex) => {
+                        if (index !== otherIndex) {
+                            const dist = getDistance(cell.center.x, cell.center.y, otherCell.center.x, otherCell.center.y);
+                            if (dist < closestDist) {
+                                closestDist = dist;
+                                closest = otherIndex;
+                            }
+                        }
+                    });
+                    
+                    if (closest !== null) {
+                        adjacencyMap[index].push(closest);
+                        adjacencyMap[closest].push(index); // Make it bidirectional
+                    }
+                }
+            });
+        }
+
+        function cellsShareEdge(cell1, cell2) {
+            // More aggressive edge detection
+            let sharedVertices = 0;
+            const threshold = 8; // Increased threshold for "same" vertex
+            
+            cell1.vertices.forEach(v1 => {
+                cell2.vertices.forEach(v2 => {
+                    const dist = Math.sqrt((v1.x - v2.x)**2 + (v1.y - v2.y)**2);
+                    if (dist < threshold) {
+                        sharedVertices++;
+                    }
+                });
+            });
+            
+            // Also check center distance as fallback
+            const centerDist = getDistance(cell1.center.x, cell1.center.y, cell2.center.x, cell2.center.y);
+            const avgSize = Math.sqrt(calculatePolygonArea(cell1.vertices.map(v => [v.x, v.y]))) + 
+                           Math.sqrt(calculatePolygonArea(cell2.vertices.map(v => [v.x, v.y])));
+            
+            return sharedVertices >= 2 || centerDist < avgSize * 0.8;
+        }
+
+        function getDistance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
         }
 
         function renderVoronoiBoard() {
@@ -375,9 +460,10 @@
             svg.innerHTML = '';
             
             // Generate cells if not already done
-            if (voronoiCells.length === 0) {
+            if (!boardGenerated) {
                 voronoiCells = generateSymmetricVoronoi();
                 buildAdjacencyMap();
+                boardGenerated = true;
             }
             
             // Render each cell
@@ -402,61 +488,49 @@
             });
         }
 
-        function buildAdjacencyMap() {
-            adjacencyMap = {};
+        function checkWinner(board) {
+            if (!board || board.length === 0) return null;
+            
+            // Define edge cells dynamically based on actual cell positions
+            const topCells = [];
+            const bottomCells = [];
+            const leftCells = [];
+            const rightCells = [];
+            
+            const edgeThreshold = 50; // Distance from edge to be considered an edge cell
             
             voronoiCells.forEach((cell, index) => {
-                adjacencyMap[index] = [];
-                
-                voronoiCells.forEach((otherCell, otherIndex) => {
-                    if (index !== otherIndex && cellsAreAdjacent(cell, otherCell)) {
-                        adjacencyMap[index].push(otherIndex);
-                    }
-                });
+                if (cell.center.y < edgeThreshold) topCells.push(index);
+                if (cell.center.y > 450) bottomCells.push(index);
+                if (cell.center.x < edgeThreshold) leftCells.push(index);
+                if (cell.center.x > 450) rightCells.push(index);
             });
-        }
-
-        function cellsAreAdjacent(cell1, cell2) {
-            // Simple distance-based adjacency for now
-            const dx = cell1.center.x - cell2.center.x;
-            const dy = cell1.center.y - cell2.center.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            return distance < 120; // Adjust threshold as needed
-        }
-
-        function checkWinner(board) {
+            
             // Check if Player 1 (X) connects top to bottom
-            const topCells = voronoiCells
-                .map((cell, index) => ({ index, y: cell.center.y }))
-                .filter(item => item.y < 100 && board[item.index] === 'X')
-                .map(item => item.index);
+            const topXCells = topCells.filter(i => board[i] === 'X');
+            const bottomXCells = bottomCells.filter(i => board[i] === 'X');
             
-            const bottomCells = voronoiCells
-                .map((cell, index) => ({ index, y: cell.center.y }))
-                .filter(item => item.y > 400 && board[item.index] === 'X')
-                .map(item => item.index);
-            
-            if (hasPath(topCells, bottomCells, 'X', board)) {
-                return 'X';
+            if (topXCells.length > 0 && bottomXCells.length > 0) {
+                if (hasPath(topXCells, bottomXCells, 'X', board)) {
+                    console.log('Player X wins by connecting top to bottom!');
+                    return 'X';
+                }
             }
             
             // Check if Player 2 (O) connects left to right
-            const leftCells = voronoiCells
-                .map((cell, index) => ({ index, x: cell.center.x }))
-                .filter(item => item.x < 100 && board[item.index] === 'O')
-                .map(item => item.index);
+            const leftOCells = leftCells.filter(i => board[i] === 'O');
+            const rightOCells = rightCells.filter(i => board[i] === 'O');
             
-            const rightCells = voronoiCells
-                .map((cell, index) => ({ index, x: cell.center.x }))
-                .filter(item => item.x > 400 && board[item.index] === 'O')
-                .map(item => item.index);
-            
-            if (hasPath(leftCells, rightCells, 'O', board)) {
-                return 'O';
+            if (leftOCells.length > 0 && rightOCells.length > 0) {
+                if (hasPath(leftOCells, rightOCells, 'O', board)) {
+                    console.log('Player O wins by connecting left to right!');
+                    return 'O';
+                }
             }
             
             // Check for draw (board full)
             if (board.every(cell => cell !== '')) {
+                console.log('Board is full - draw!');
                 return 'draw';
             }
             
@@ -464,8 +538,15 @@
         }
 
         function hasPath(startCells, endCells, player, board) {
+            if (!adjacencyMap || Object.keys(adjacencyMap).length === 0) {
+                console.warn('Adjacency map not built yet');
+                return false;
+            }
+            
             const visited = new Set();
             const queue = [...startCells];
+            
+            console.log(`Checking path for ${player} from cells [${startCells}] to cells [${endCells}]`);
             
             while (queue.length > 0) {
                 const current = queue.shift();
@@ -473,7 +554,9 @@
                 if (visited.has(current)) continue;
                 visited.add(current);
                 
+                // Check if we've reached any end cell
                 if (endCells.includes(current)) {
+                    console.log(`Path found! ${player} connected through cell ${current}`);
                     return true;
                 }
                 
@@ -486,6 +569,7 @@
                 });
             }
             
+            console.log(`No path found for ${player}`);
             return false;
         }
 
