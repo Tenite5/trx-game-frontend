@@ -270,6 +270,15 @@
             Loading game...
         </div>
 
+        <div class="timer-display" id="timer-display" style="display: none;">
+            <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">
+                Time remaining: <span id="timer-countdown">20</span>s
+            </div>
+            <div style="width: 100%; height: 10px; background: #ddd; border-radius: 5px; overflow: hidden;">
+                <div id="timer-bar" style="height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); width: 100%; transition: width 0.1s linear;"></div>
+            </div>
+        </div>
+
         <div class="game-board">
             <svg width="500" height="500" id="game-svg">
                 <!-- Voronoi cells will be rendered here from backend data -->
@@ -293,6 +302,7 @@
         
         let gameData = {};
         let gameInterval = null;
+        let timerInterval = null;
         let voronoiCells = [];
         let adjacencyMap = {};
         let edgeCells = {};
@@ -461,6 +471,58 @@
             // Update turn indicator and status
             updateTurnIndicator();
             updateGameStatus();
+            updateTimer();
+        }
+
+        function updateTimer() {
+            const timerDisplay = document.getElementById('timer-display');
+            const timerCountdown = document.getElementById('timer-countdown');
+            const timerBar = document.getElementById('timer-bar');
+            
+            // Clear existing timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            if (gameData.status === 'in_progress' && gameData.timeRemaining !== null) {
+                timerDisplay.style.display = 'block';
+                
+                let remainingMs = gameData.timeRemaining;
+                
+                // Update timer every 100ms for smooth countdown
+                timerInterval = setInterval(() => {
+                    remainingMs -= 100;
+                    
+                    if (remainingMs <= 0) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        timerCountdown.textContent = '0';
+                        timerBar.style.width = '0%';
+                        
+                        // Force refresh to get timeout result
+                        loadGame();
+                        return;
+                    }
+                    
+                    const seconds = Math.ceil(remainingMs / 1000);
+                    const percentage = (remainingMs / 20000) * 100;
+                    
+                    timerCountdown.textContent = seconds;
+                    timerBar.style.width = percentage + '%';
+                    
+                    // Change color as time runs out
+                    if (percentage > 50) {
+                        timerBar.style.background = '#28a745';
+                    } else if (percentage > 25) {
+                        timerBar.style.background = '#ffc107';
+                    } else {
+                        timerBar.style.background = '#dc3545';
+                    }
+                }, 100);
+            } else {
+                timerDisplay.style.display = 'none';
+            }
         }
 
         function updateTurnIndicator() {
@@ -601,6 +663,11 @@
                 gameInterval = null;
             }
             
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
             // Forfeit the game if it's in progress
             if (gameData.status === 'in_progress') {
                 const shouldForfeit = confirm('Leaving will forfeit the game and you will lose. Are you sure?');
@@ -640,6 +707,10 @@
             
             if (gameInterval) {
                 clearInterval(gameInterval);
+            }
+            
+            if (timerInterval) {
+                clearInterval(timerInterval);
             }
         });
     </script>
