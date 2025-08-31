@@ -304,41 +304,47 @@
             window.location.href = 'dashboard.html';
         }
 
-        // Generate symmetric Voronoi diagram using D3
+        // Generate symmetric Voronoi diagram using D3 that fills entire space
         function generateSymmetricVoronoi() {
             const width = 500;
             const height = 500;
-            const numPoints = 20; // Generate 20 points in one quadrant = 80 total points
+            const numPoints = 12; // Reduced to ensure better coverage
             const basePoints = [];
             
-            // Generate random points in one quadrant with varying densities
-            for (let i = 0; i < numPoints; i++) {
-                // Create clusters and sparse areas for more variety
-                const clusterCenter = {
-                    x: Math.random() * (width / 2 - 40) + 20,
-                    y: Math.random() * (height / 2 - 40) + 20
-                };
-                
-                // Add some clustering effect
-                const clusterOffset = Math.random() * 30;
-                const angle = Math.random() * 2 * Math.PI;
-                
-                basePoints.push([
-                    Math.max(20, Math.min(width/2 - 20, clusterCenter.x + Math.cos(angle) * clusterOffset)),
-                    Math.max(20, Math.min(height/2 - 20, clusterCenter.y + Math.sin(angle) * clusterOffset))
-                ]);
+            // Generate points in a more structured way to ensure full coverage
+            const gridCols = 3;
+            const gridRows = 4;
+            const cellWidth = (width / 2) / gridCols;
+            const cellHeight = (height / 2) / gridRows;
+            
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    const centerX = col * cellWidth + cellWidth / 2;
+                    const centerY = row * cellHeight + cellHeight / 2;
+                    
+                    // Add some randomness but keep within cell bounds
+                    const offsetX = (Math.random() - 0.5) * cellWidth * 0.4;
+                    const offsetY = (Math.random() - 0.5) * cellHeight * 0.4;
+                    
+                    basePoints.push([
+                        Math.max(20, Math.min(width/2 - 20, centerX + offsetX)),
+                        Math.max(20, Math.min(height/2 - 20, centerY + offsetY))
+                    ]);
+                }
             }
             
             // Mirror points to create full symmetry
             const allPoints = [];
             basePoints.forEach(point => {
                 const x = point[0], y = point[1];
-                // Add all 4 mirror positions
                 allPoints.push([x, y]);                           // Original
                 allPoints.push([width - x, y]);                  // Horizontal mirror
                 allPoints.push([x, height - y]);                 // Vertical mirror  
                 allPoints.push([width - x, height - y]);         // Both mirrors
             });
+
+            // Add corner points to ensure full coverage
+            allPoints.push([10, 10], [width-10, 10], [10, height-10], [width-10, height-10]);
 
             // Create Delaunay triangulation and Voronoi diagram
             const delaunay = d3.Delaunay.from(allPoints);
@@ -347,15 +353,14 @@
             const cells = [];
             for (let i = 0; i < allPoints.length; i++) {
                 const cell = voronoi.cellPolygon(i);
-                if (cell && cell.length >= 3 && cell.length <= 7) { // Only keep cells with 3-7 sides
-                    // Calculate cell area to filter by size
+                if (cell && cell.length >= 3) {
+                    // Calculate cell area
                     const area = calculatePolygonArea(cell);
-                    const avgArea = (width * height) / allPoints.length;
                     
-                    // Keep cells that are between 0.5x and 2.5x average size
-                    if (area > avgArea * 0.5 && area < avgArea * 2.5) {
+                    // Only exclude extremely small cells
+                    if (area > 100) {
                         cells.push({
-                            id: cells.length, // Reindex to be sequential
+                            id: cells.length, // Sequential ID
                             center: { x: allPoints[i][0], y: allPoints[i][1] },
                             vertices: cell.map(v => ({ x: v[0], y: v[1] })),
                             claimed: false,
@@ -365,13 +370,8 @@
                 }
             }
             
-            // Ensure we have at least 16 cells for the game
-            if (cells.length < 16) {
-                console.warn(`Only generated ${cells.length} valid cells, regenerating...`);
-                return generateSymmetricVoronoi(); // Try again
-            }
-            
-            return cells.slice(0, Math.min(64, cells.length)); // Cap at 64 cells for performance
+            console.log(`Generated ${cells.length} cells`);
+            return cells;
         }
 
         function calculatePolygonArea(vertices) {
@@ -464,6 +464,7 @@
                 voronoiCells = generateSymmetricVoronoi();
                 buildAdjacencyMap();
                 boardGenerated = true;
+                initializeBoard(); // Initialize backend board
             }
             
             // Render each cell
@@ -481,11 +482,60 @@
                     polygon.classList.add('claimed');
                 }
                 
+                // Disable clicks if not player's turn or game not in progress
+                if (!gameData.isYourTurn || gameData.status !== 'in_progress' || (gameData.board && gameData.board[index] !== '')) {
+                    polygon.classList.add('disabled');
+                }
+                
                 // Add click handler
                 polygon.addEventListener('click', () => makeMove(index));
                 
                 svg.appendChild(polygon);
             });
+        }
+
+        // Initialize board layout on backend
+        async function initializeBoard() {
+            try {
+                // Build edge cells based on actual positions
+                const edgeCells = {
+                    top: [],
+                    bottom: [],
+                    left: [],
+                    right: []
+                };
+                
+                const edgeThreshold = 50;
+                voronoiCells.forEach((cell, index) => {
+                    if (cell.center.y < edgeThreshold) edgeCells.top.push(index);
+                    if (cell.center.y > 450) edgeCells.bottom.push(index);
+                    if (cell.center.x < edgeThreshold) edgeCells.left.push(index);
+                    if (cell.center.x > 450) edgeCells.right.push(index);
+                });
+                
+                console.log('Edge cells:', edgeCells);
+                console.log('Board size:', voronoiCells.length);
+                
+                // Send board layout to server
+                const response = await fetch(`${API_URL}/game/${gameId}/init-board`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        boardSize: voronoiCells.length,
+                        edgeCells,
+                        adjacencyMap
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to initialize board on backend');
+                }
+            } catch (error) {
+                console.error('Failed to initialize board:', error);
+            }
         }
 
         function checkWinner(board) {
@@ -746,11 +796,46 @@
                 clearInterval(gameInterval);
                 gameInterval = null;
             }
-            window.location.href = 'dashboard.html';
+            
+            // Forfeit the game if it's in progress
+            if (gameData.status === 'in_progress') {
+                const shouldForfeit = confirm('Leaving will forfeit the game and you will lose. Are you sure?');
+                if (!shouldForfeit) {
+                    return; // Don't leave if user cancels
+                }
+                
+                // Send forfeit request
+                forfeitGame().then(() => {
+                    window.location.href = 'dashboard.html';
+                });
+            } else {
+                window.location.href = 'dashboard.html';
+            }
         }
 
-        // Clean up interval when page is closed
-        window.addEventListener('beforeunload', () => {
+        async function forfeitGame() {
+            try {
+                await fetch(`${API_URL}/game/${gameId}/forfeit`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to forfeit game:', error);
+            }
+        }
+
+        // Also handle page close/refresh
+        window.addEventListener('beforeunload', (e) => {
+            if (gameData.status === 'in_progress') {
+                e.preventDefault();
+                e.returnValue = 'Leaving will forfeit the game and you will lose. Are you sure?';
+                
+                // Send forfeit in background (may not always work due to browser limitations)
+                navigator.sendBeacon(`${API_URL}/game/${gameId}/forfeit`, JSON.stringify({}));
+            }
+            
             if (gameInterval) {
                 clearInterval(gameInterval);
             }
