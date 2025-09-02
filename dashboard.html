@@ -3,95 +3,299 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TRX Game - Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+    <title>TRX Voronoi Hex - Dashboard</title>
     <style>
-        .game-info {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 10px;
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
             padding: 20px;
-            margin: 20px 0;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+
+        h1 {
             text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
         }
-        
-        .game-rules {
-            background: #e7f3ff;
-            border-left: 4px solid #007bff;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
+
+        .welcome-message {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            color: #666;
         }
-        
-        .game-rules h3 {
-            margin-top: 0;
-            color: #007bff;
-        }
-        
-        .queue-status {
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            font-weight: bold;
-        }
-        
-        .queue-waiting {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-        }
-        
-        .queue-found {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-        
-        .action-buttons button:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        
+
         .balance-info {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 0;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
         }
-        
+
         .balance-info p {
             margin: 0;
-            font-size: 18px;
+            font-size: 24px;
             font-weight: bold;
+        }
+
+        .game-info {
+            background: #f8f9fa;
+            border: 2px solid #007bff;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: center;
+        }
+
+        .game-info h3 {
+            color: #007bff;
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+
+        .game-info p {
+            margin: 8px 0;
+            font-size: 1.1em;
+        }
+
+        .game-rules {
+            background: #e7f3ff;
+            border-left: 5px solid #007bff;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+
+        .game-rules h3 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 1.4em;
+        }
+
+        .game-rules ul {
+            text-align: left;
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .game-rules li {
+            margin: 8px 0;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none;
+        }
+
+        #queue-button {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            font-size: 18px;
+            padding: 18px 35px;
+        }
+
+        #queue-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #218838, #1a9971);
+        }
+
+        #cancel-queue-button {
+            background: #dc3545;
+            display: none;
+        }
+
+        #cancel-queue-button:hover {
+            background: #c82333;
+        }
+
+        #deposit-button {
+            background: #17a2b8;
+        }
+
+        #deposit-button:hover {
+            background: #138496;
+        }
+
+        #withdraw-button {
+            background: #ffc107;
+            color: #333;
+        }
+
+        #withdraw-button:hover {
+            background: #e0a800;
+        }
+
+        #logout-button {
+            background: #dc3545;
+            margin-top: 20px;
+        }
+
+        #logout-button:hover {
+            background: #c82333;
+        }
+
+        .queue-status {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+
+        .queue-waiting {
+            background: #fff3cd;
+            border: 2px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .queue-found {
+            background: #d4edda;
+            border: 2px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .message {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .footer-disclaimer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+        }
+
+        .footer-disclaimer p {
+            font-size: 12px;
+            color: #6c757d;
+            margin: 10px 0;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 100%;
+                max-width: 300px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎮 TRX Tic Tac Toe Arena</h1>
-        <p class="welcome-message">Welcome back, <span id="username-display"></span>!</p>
+        <h1>🔷 TRX Voronoi Hex Arena</h1>
+        <p class="welcome-message">Welcome back, <span id="username-display">Loading...</span>!</p>
 
         <div class="balance-info">
             <p>💰 Your Balance: <span id="balance-display">Loading...</span> TRX</p>
         </div>
 
         <div class="game-info">
-            <h3>🎯 Ready to Play?</h3>
+            <h3>🎯 Ready for Strategic Battle?</h3>
             <p>Stake: <strong>10 TRX</strong> per game</p>
             <p>Winner takes: <strong>19.5 TRX</strong> (2.5% platform fee)</p>
-            <p>Game: <strong>Tic Tac Toe</strong> - Best strategy wins!</p>
+            <p>Game: <strong>Voronoi Hex</strong> - Connect your sides to win!</p>
         </div>
 
         <div class="game-rules">
-            <h3>📋 How It Works</h3>
-            <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
-                <li>Click "Queue for Game" to join the matchmaking pool</li>
-                <li>You'll be matched with another player automatically</li>
-                <li>Play Tic Tac Toe - get 3 in a row to win!</li>
-                <li>Winner gets 19.5 TRX, ties refund both players</li>
-                <li>Make sure you have at least 10 TRX to play</li>
+            <h3>📋 How Voronoi Hex Works</h3>
+            <ul>
+                <li><strong>Objective:</strong> Connect your assigned opposite sides with a continuous chain of your cells</li>
+                <li><strong>Player 1 (Red):</strong> Must connect TOP edge to BOTTOM edge</li>
+                <li><strong>Player 2 (Blue):</strong> Must connect LEFT edge to RIGHT edge</li>
+                <li><strong>Gameplay:</strong> Take turns claiming cells on the irregular Voronoi board</li>
+                <li><strong>Victory:</strong> First player to form a connecting path wins all stakes</li>
+                <li><strong>Draw Rule:</strong> If board fills without a winner, last player to move loses</li>
+                <li><strong>Time Limit:</strong> 30 seconds per turn (timeout = automatic loss)</li>
             </ul>
         </div>
 
@@ -102,23 +306,298 @@
             <button id="withdraw-button">💸 Withdraw TRX</button>
         </div>
 
-        <div id="status-message" class="message"></div>
-        
-        <div id="game-results" style="display: none;">
-            <h3>🏆 Last Game Result</h3>
-            <p>Status: <span id="game-status"></span></p>
-            <p>Opponent: <span id="opponent-name"></span></p>
-            <p>Winner: <span id="winner-name"></span></p>
+        <div id="queue-status" class="queue-status">
+            <div class="loading"></div>
+            <span id="queue-message">Searching for opponent...</span>
         </div>
 
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
-            <button id="logout-button" style="background: #dc3545;">🚪 Logout</button>
-        </div>
+        <div id="status-message" class="message" style="display: none;"></div>
 
-        <div style="margin-top: 20px; font-size: 12px; color: #6c757d; text-align: center;">
-            <p>⚠️ This is a skill-based game, not gambling. Play responsibly!</p>
+        <div class="footer-disclaimer">
+            <button id="logout-button">🚪 Logout</button>
+            <p>⚠️ This is a skill-based strategy game. Play responsibly!</p>
+            <p>🎮 Voronoi Hex combines geometry with strategic thinking</p>
         </div>
     </div>
-    <script src="script.js"></script>
+
+    <script>
+        const API_URL = 'https://trx-game-backend.onrender.com/api';
+        const token = localStorage.getItem('token');
+        let queueInterval = null;
+        let currentGameId = null;
+
+        // Check authentication
+        if (!token) {
+            window.location.href = 'index.html';
+        }
+
+        // Load user data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadBalance();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('queue-button').addEventListener('click', queueForGame);
+            document.getElementById('cancel-queue-button').addEventListener('click', cancelQueue);
+            document.getElementById('deposit-button').addEventListener('click', showDepositPrompt);
+            document.getElementById('withdraw-button').addEventListener('click', showWithdrawPrompt);
+            document.getElementById('logout-button').addEventListener('click', logout);
+        }
+
+        async function loadBalance() {
+            try {
+                const response = await fetch(`${API_URL}/balance`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        logout();
+                        return;
+                    }
+                    throw new Error('Failed to load balance');
+                }
+                
+                const data = await response.json();
+                document.getElementById('username-display').textContent = data.username;
+                document.getElementById('balance-display').textContent = data.trx_balance.toFixed(2);
+                
+                // Store username for later use
+                localStorage.setItem('username', data.username);
+                
+            } catch (error) {
+                console.error('Balance error:', error);
+                showMessage('Failed to load balance. Please refresh the page.', 'error');
+            }
+        }
+
+        async function queueForGame() {
+            const queueButton = document.getElementById('queue-button');
+            const cancelButton = document.getElementById('cancel-queue-button');
+            const queueStatus = document.getElementById('queue-status');
+            
+            queueButton.disabled = true;
+            queueButton.innerHTML = '<div class="loading"></div>Joining queue...';
+            
+            try {
+                const response = await fetch(`${API_URL}/queue`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message);
+                }
+                
+                currentGameId = data.gameId;
+                
+                if (data.status === 'in_progress') {
+                    // Match found immediately
+                    showMessage(`Match found! Playing against ${data.opponent}`, 'success');
+                    setTimeout(() => {
+                        window.location.href = `game.html?gameId=${data.gameId}`;
+                    }, 2000);
+                } else {
+                    // Waiting in queue
+                    queueStatus.style.display = 'block';
+                    queueButton.style.display = 'none';
+                    cancelButton.style.display = 'inline-block';
+                    
+                    // Start polling for match
+                    startQueuePolling(data.gameId);
+                }
+                
+                // Refresh balance after queuing
+                loadBalance();
+                
+            } catch (error) {
+                console.error('Queue error:', error);
+                showMessage(error.message, 'error');
+                resetQueueUI();
+            }
+        }
+
+        function startQueuePolling(gameId) {
+            queueInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_URL}/match-status/${gameId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to check match status');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'in_progress' && data.player2) {
+                        clearInterval(queueInterval);
+                        queueInterval = null;
+                        
+                        showMessage(`Match found! Playing against ${data.player2}`, 'success');
+                        setTimeout(() => {
+                            window.location.href = `game.html?gameId=${gameId}`;
+                        }, 2000);
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                    clearInterval(queueInterval);
+                    queueInterval = null;
+                    showMessage('Connection error. Please try again.', 'error');
+                    resetQueueUI();
+                }
+            }, 3000); // Check every 3 seconds
+        }
+
+        async function cancelQueue() {
+            if (queueInterval) {
+                clearInterval(queueInterval);
+                queueInterval = null;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/cancel-queue`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                showMessage(data.message, 'success');
+                resetQueueUI();
+                loadBalance(); // Refresh balance after refund
+                
+            } catch (error) {
+                console.error('Cancel queue error:', error);
+                showMessage('Failed to cancel queue.', 'error');
+            }
+        }
+
+        function resetQueueUI() {
+            const queueButton = document.getElementById('queue-button');
+            const cancelButton = document.getElementById('cancel-queue-button');
+            const queueStatus = document.getElementById('queue-status');
+            
+            queueButton.disabled = false;
+            queueButton.innerHTML = '🎲 Queue for Game';
+            queueButton.style.display = 'inline-block';
+            cancelButton.style.display = 'none';
+            queueStatus.style.display = 'none';
+            currentGameId = null;
+        }
+
+        function showDepositPrompt() {
+            const amount = prompt('Enter deposit amount (TRX):');
+            if (amount && !isNaN(amount) && parseFloat(amount) >= 1) {
+                depositTRX(parseFloat(amount));
+            } else if (amount !== null) {
+                showMessage('Invalid amount. Please enter a number >= 1.', 'error');
+            }
+        }
+
+        async function depositTRX(amount) {
+            try {
+                const response = await fetch(`${API_URL}/deposit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ amount })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message);
+                }
+                
+                // Open payment URL in new tab
+                window.open(data.paymentUrl, '_blank');
+                showMessage('Deposit invoice created. Complete payment in the new tab.', 'success');
+                
+            } catch (error) {
+                console.error('Deposit error:', error);
+                showMessage(error.message, 'error');
+            }
+        }
+
+        function showWithdrawPrompt() {
+            const amount = prompt('Enter withdrawal amount (TRX):');
+            if (amount && !isNaN(amount) && parseFloat(amount) >= 1) {
+                const address = prompt('Enter your TRON wallet address:');
+                if (address && address.length >= 34) {
+                    withdrawTRX(parseFloat(amount), address);
+                } else if (address !== null) {
+                    showMessage('Invalid TRON address.', 'error');
+                }
+            } else if (amount !== null) {
+                showMessage('Invalid amount. Please enter a number >= 1.', 'error');
+            }
+        }
+
+        async function withdrawTRX(amount, address) {
+            try {
+                const response = await fetch(`${API_URL}/withdraw`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ amount, tronWalletAddress: address })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message);
+                }
+                
+                showMessage(`Withdrawal successful! You received ${data.payoutAmount} TRX.`, 'success');
+                loadBalance(); // Refresh balance
+                
+            } catch (error) {
+                console.error('Withdraw error:', error);
+                showMessage(error.message, 'error');
+            }
+        }
+
+        function showMessage(message, type = 'success') {
+            const messageElement = document.getElementById('status-message');
+            messageElement.textContent = message;
+            messageElement.className = `message ${type}`;
+            messageElement.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messageElement.style.display = 'none';
+            }, 5000);
+        }
+
+        function logout() {
+            if (queueInterval) {
+                clearInterval(queueInterval);
+            }
+            
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = 'index.html';
+        }
+
+        // Auto-refresh balance every 30 seconds
+        setInterval(loadBalance, 30000);
+
+        // Handle page visibility for queue polling
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && queueInterval) {
+                clearInterval(queueInterval);
+                queueInterval = null;
+            } else if (!document.hidden && currentGameId && document.getElementById('queue-status').style.display === 'block') {
+                startQueuePolling(currentGameId);
+            }
+        });
+    </script>
 </body>
 </html>
