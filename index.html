@@ -3,33 +3,414 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TRX Game</title>
-    <link rel="stylesheet" href="style.css">
+    <title>TRX Voronoi Hex - Login</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .form-container {
+            display: none;
+        }
+
+        .form-container.active {
+            display: block;
+        }
+
+        .form-container h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        input[type="text"], input[type="password"] {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #0056b3, #004085);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .message {
+            text-align: center;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .switch-form {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .switch-form a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .switch-form a:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .game-preview {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .game-preview h3 {
+            color: #007bff;
+            margin-top: 0;
+            font-size: 1.3em;
+        }
+
+        .game-preview ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .game-preview li {
+            margin: 5px 0;
+            color: #555;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container" id="auth-forms">
+    <div class="container">
+        <div class="header">
+            <h1>TRX Voronoi Hex</h1>
+            <p>Strategic Connection Game</p>
+        </div>
+
         <div class="form-container active" id="login-form-container">
             <h2>Login</h2>
             <form id="login-form">
-                <input type="text" id="login-username" placeholder="Username" required>
-                <input type="password" id="login-password" placeholder="Password" required>
-                <button type="submit">Login</button>
+                <input type="text" id="login-username" placeholder="Username" required minlength="3">
+                <input type="password" id="login-password" placeholder="Password" required minlength="6">
+                <button type="submit" id="login-button">Login</button>
             </form>
-            <p id="login-message" class="message"></p>
-            <p>Don't have an account? <a href="#" id="show-register">Register here</a></p>
+            <div id="login-message" class="message"></div>
+            <div class="switch-form">
+                <p>Don't have an account? <a href="#" id="show-register">Register here</a></p>
+            </div>
         </div>
 
         <div class="form-container" id="register-form-container">
-            <h2>Register</h2>
+            <h2>Create Account</h2>
             <form id="register-form">
-                <input type="text" id="reg-username" placeholder="Username" required>
-                <input type="password" id="reg-password" placeholder="Password" required>
-                <button type="submit">Register</button>
+                <input type="text" id="reg-username" placeholder="Username (min 3 characters)" required minlength="3">
+                <input type="password" id="reg-password" placeholder="Password (min 6 characters)" required minlength="6">
+                <button type="submit" id="register-button">Create Account</button>
             </form>
-            <p id="reg-message" class="message"></p>
-            <p>Already have an account? <a href="#" id="show-login">Login here</a></p>
+            <div id="reg-message" class="message"></div>
+            <div class="switch-form">
+                <p>Already have an account? <a href="#" id="show-login">Login here</a></p>
+            </div>
+        </div>
+
+        <div class="game-preview">
+            <h3>About Voronoi Hex</h3>
+            <ul>
+                <li><strong>Stake:</strong> 10 TRX per game</li>
+                <li><strong>Winner takes:</strong> 19.5 TRX (2.5% platform fee)</li>
+                <li><strong>Goal:</strong> Connect your assigned sides</li>
+                <li><strong>Red Player:</strong> Connect top to bottom</li>
+                <li><strong>Blue Player:</strong> Connect left to right</li>
+                <li><strong>New players:</strong> Start with 100 TRX bonus!</li>
+            </ul>
         </div>
     </div>
-    <script src="script.js"></script>
+
+    <script>
+        const API_URL = 'https://trx-game-backend.onrender.com/api';
+
+        // Check if already logged in
+        if (localStorage.getItem('token')) {
+            window.location.href = 'dashboard.html';
+        }
+
+        // Form switching
+        document.getElementById('show-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            showForm('register');
+        });
+
+        document.getElementById('show-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            showForm('login');
+        });
+
+        function showForm(type) {
+            document.getElementById('login-form-container').classList.toggle('active', type === 'login');
+            document.getElementById('register-form-container').classList.toggle('active', type === 'register');
+            
+            // Clear messages when switching
+            clearMessages();
+        }
+
+        function clearMessages() {
+            document.getElementById('login-message').classList.remove('show');
+            document.getElementById('reg-message').classList.remove('show');
+        }
+
+        // Login form
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            const button = document.getElementById('login-button');
+            const messageEl = document.getElementById('login-message');
+            
+            if (!username || !password) {
+                showMessage(messageEl, 'Please fill in all fields.', 'error');
+                return;
+            }
+            
+            button.disabled = true;
+            button.innerHTML = '<div class="loading"></div>Logging in...';
+            clearMessages();
+            
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', data.username);
+                    showMessage(messageEl, 'Login successful! Redirecting...', 'success');
+                    
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 1500);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showMessage(messageEl, error.message || 'Login failed. Please try again.', 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Login';
+            }
+        });
+
+        // Register form
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('reg-username').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const button = document.getElementById('register-button');
+            const messageEl = document.getElementById('reg-message');
+            
+            if (!username || !password) {
+                showMessage(messageEl, 'Please fill in all fields.', 'error');
+                return;
+            }
+            
+            if (username.length < 3) {
+                showMessage(messageEl, 'Username must be at least 3 characters long.', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showMessage(messageEl, 'Password must be at least 6 characters long.', 'error');
+                return;
+            }
+            
+            button.disabled = true;
+            button.innerHTML = '<div class="loading"></div>Creating account...';
+            clearMessages();
+            
+            try {
+                const response = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage(messageEl, data.message + ' Please login with your new account.', 'success');
+                    
+                    // Clear form and switch to login after 2 seconds
+                    setTimeout(() => {
+                        document.getElementById('register-form').reset();
+                        showForm('login');
+                    }, 2000);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showMessage(messageEl, error.message || 'Registration failed. Please try again.', 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Create Account';
+            }
+        });
+
+        function showMessage(element, message, type) {
+            element.textContent = message;
+            element.className = `message ${type} show`;
+            
+            // Auto-hide error messages after 5 seconds
+            if (type === 'error') {
+                setTimeout(() => {
+                    element.classList.remove('show');
+                }, 5000);
+            }
+        }
+
+        // Form validation
+        document.getElementById('login-username').addEventListener('input', (e) => {
+            e.target.value = e.target.value.trim();
+        });
+        
+        document.getElementById('reg-username').addEventListener('input', (e) => {
+            e.target.value = e.target.value.trim();
+        });
+
+        // Enter key support
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const activeForm = document.querySelector('.form-container.active form');
+                if (activeForm) {
+                    activeForm.dispatchEvent(new Event('submit'));
+                }
+            }
+        });
+    </script>
 </body>
 </html>

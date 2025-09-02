@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TRX Game - Voronoi Hex</title>
+    <title>TRX Voronoi Hex - Game</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -22,46 +22,146 @@
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
             padding: 30px;
             text-align: center;
-            max-width: 700px;
-            width: 90%;
+            max-width: 800px;
+            width: 95%;
+            max-height: 95vh;
+            overflow-y: auto;
         }
 
         h1 {
             color: #333;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 2.2em;
         }
 
-        .game-info {
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
             padding: 15px;
             background: #f8f9fa;
             border-radius: 10px;
             border-left: 4px solid #007bff;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
-        .game-info p {
-            margin: 5px 0;
-            font-weight: 500;
+        .player-info {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .player-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .player-info p {
+            margin: 3px 0;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .game-stats {
+            text-align: center;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .game-stats p {
+            margin: 3px 0;
+            font-weight: 600;
+            color: #007bff;
         }
 
         .turn-indicator {
             font-size: 18px;
             font-weight: bold;
-            margin-bottom: 20px;
-            padding: 10px;
-            border-radius: 8px;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
         }
 
         .your-turn {
-            background: #d4edda;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
             color: #155724;
-            border: 1px solid #c3e6cb;
+            border: 2px solid #28a745;
+            animation: pulse 2s infinite;
         }
 
         .opponent-turn {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border: 2px solid #ffc107;
+        }
+
+        .game-over-indicator {
+            background: linear-gradient(135deg, #e2e3e5, #d6d8db);
+            color: #383d41;
+            border: 2px solid #6c757d;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .timer-display {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px solid #007bff;
+        }
+
+        .timer-text {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .timer-bar-container {
+            width: 100%;
+            height: 12px;
+            background: #e9ecef;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .timer-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+            transition: width 0.1s linear;
+            border-radius: 6px;
+        }
+
+        .side-indicators {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .player1-goal {
+            color: #e74c3c;
+            padding: 8px 12px;
+            background: rgba(231, 76, 60, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        .player2-goal {
+            color: #3498db;
+            padding: 8px 12px;
+            background: rgba(52, 152, 219, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(52, 152, 219, 0.3);
         }
 
         .game-board {
@@ -70,8 +170,9 @@
             height: 500px;
             margin: 20px auto;
             border: 3px solid #333;
-            border-radius: 10px;
-            background: white;
+            border-radius: 15px;
+            background: #ffffff;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
         }
 
         .voronoi-cell {
@@ -82,88 +183,104 @@
             fill: #f8f9fa;
         }
 
-        .voronoi-cell:hover:not(.claimed) {
+        .voronoi-cell:hover:not(.claimed):not(.disabled) {
             fill: #e9ecef;
             stroke-width: 3;
+            filter: drop-shadow(0 0 5px rgba(0, 123, 255, 0.3));
         }
 
         .voronoi-cell.player1 {
             fill: #e74c3c;
-            opacity: 0.8;
+            opacity: 0.85;
+            stroke: #c0392b;
         }
 
         .voronoi-cell.player2 {
             fill: #3498db;
-            opacity: 0.8;
+            opacity: 0.85;
+            stroke: #2980b9;
         }
 
         .voronoi-cell.disabled {
             cursor: not-allowed;
         }
 
-        .hex-rules {
-            background: #e7f3ff;
-            border-left: 4px solid #007bff;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-            text-align: left;
+        .voronoi-cell.your-symbol:hover:not(.claimed) {
+            fill: rgba(40, 167, 69, 0.2);
         }
 
-        .hex-rules h3 {
-            margin-top: 0;
-            color: #007bff;
-        }
-
-        .side-indicators {
-            display: flex;
-            justify-content: space-between;
-            margin: 10px 0;
-            font-weight: bold;
-        }
-
-        .player1-sides {
-            color: #e74c3c;
-        }
-
-        .player2-sides {
-            color: #3498db;
+        .edge-indicator {
+            opacity: 0.6;
+            pointer-events: none;
         }
 
         .status-message {
             margin: 20px 0;
             font-size: 18px;
-            font-weight: bold;
-            padding: 10px;
-            border-radius: 8px;
+            font-weight: 600;
+            padding: 15px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
         }
 
         .waiting {
-            background: #fff3cd;
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
             color: #856404;
-            border: 1px solid #ffeaa7;
+            border: 2px solid #ffc107;
         }
 
         .error {
-            background: #f8d7da;
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
             color: #721c24;
-            border: 1px solid #f5c6cb;
+            border: 2px solid #dc3545;
         }
 
         .success {
-            background: #d4edda;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
             color: #155724;
-            border: 1px solid #c3e6cb;
+            border: 2px solid #28a745;
         }
 
-        .game-over {
-            background: #e2e3e5;
-            color: #383d41;
-            border: 1px solid #d6d8db;
+        .game-result {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 25px 0;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .winner {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border: 3px solid #28a745;
+            animation: celebrate 1s ease-in-out;
+        }
+
+        .loser {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border: 3px solid #dc3545;
+        }
+
+        .draw-result {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border: 3px solid #ffc107;
+        }
+
+        @keyframes celebrate {
+            0%, 100% { transform: scale(1); }
+            25% { transform: scale(1.05); }
+            75% { transform: scale(0.98); }
         }
 
         .action-buttons {
-            margin-top: 20px;
+            margin-top: 25px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
         button {
@@ -174,36 +291,57 @@
             border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            margin: 5px;
-            transition: background 0.2s ease;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 120px;
         }
 
         button:hover:not(:disabled) {
             background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
 
         button:disabled {
             background: #6c757d;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
-        .back-to-dashboard {
+        .refresh-button {
+            background: #17a2b8;
+        }
+
+        .refresh-button:hover:not(:disabled) {
+            background: #138496;
+        }
+
+        .forfeit-button {
+            background: #dc3545;
+        }
+
+        .forfeit-button:hover:not(:disabled) {
+            background: #c82333;
+        }
+
+        .dashboard-button {
             background: #28a745;
         }
 
-        .back-to-dashboard:hover {
+        .dashboard-button:hover:not(:disabled) {
             background: #1e7e34;
         }
 
         .loading {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #007bff;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: 10px;
+            margin-right: 8px;
         }
 
         @keyframes spin {
@@ -211,87 +349,118 @@
             100% { transform: rotate(360deg); }
         }
 
-        .game-result {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 20px 0;
-            padding: 20px;
-            border-radius: 10px;
+        .connection-hint {
+            font-size: 14px;
+            color: #666;
+            margin: 10px 0;
+            font-style: italic;
         }
 
-        .winner {
-            background: #d4edda;
-            color: #155724;
-            border: 2px solid #28a745;
+        @media (max-width: 768px) {
+            .game-container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .game-board {
+                width: 350px;
+                height: 350px;
+            }
+            
+            .game-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .side-indicators {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 100%;
+                max-width: 250px;
+            }
         }
 
-        .loser {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #dc3545;
-        }
-
-        .draw {
-            background: #fff3cd;
-            color: #856404;
-            border: 2px solid #ffc107;
+        @media (max-width: 480px) {
+            .game-board {
+                width: 280px;
+                height: 280px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="game-container">
-        <h1>Voronoi Hex Battle</h1>
+        <h1>Voronoi Hex Arena</h1>
         
-        <div class="game-info">
-            <p><strong>Player 1:</strong> <span id="player1-name">Loading...</span> (Red)</p>
-            <p><strong>Player 2:</strong> <span id="player2-name">Waiting...</span> (Blue)</p>
-            <p><strong>Stake:</strong> 10 TRX</p>
-            <p><strong>Your Color:</strong> <span id="your-color">-</span></p>
+        <div class="game-header">
+            <div class="player-info">
+                <h3>Player 1 (Red)</h3>
+                <p id="player1-name">Loading...</p>
+                <p>Goal: Top ↕ Bottom</p>
+            </div>
+            <div class="game-stats">
+                <p>Stake: 10 TRX</p>
+                <p>Winner: 19.5 TRX</p>
+                <p id="move-count">Moves: 0</p>
+            </div>
+            <div class="player-info">
+                <h3>Player 2 (Blue)</h3>
+                <p id="player2-name">Waiting...</p>
+                <p>Goal: Left ↔ Right</p>
+            </div>
         </div>
 
         <div class="side-indicators">
-            <div class="player1-sides">Player 1: Top ↓ Bottom</div>
-            <div class="player2-sides">Player 2: Left → Right</div>
-        </div>
-
-        <div class="hex-rules">
-            <h3>How to Play</h3>
-            <ul>
-                <li><strong>Goal:</strong> Connect your assigned sides with a continuous chain</li>
-                <li><strong>Player 1 (Red):</strong> Connect TOP to BOTTOM</li>
-                <li><strong>Player 2 (Blue):</strong> Connect LEFT to RIGHT</li>
-                <li><strong>Rules:</strong> Click to claim cells, first to connect wins!</li>
-                <li><strong>Draw:</strong> If board fills without winner, last player to move loses</li>
-            </ul>
+            <div class="player1-goal">Red: Connect Top to Bottom</div>
+            <div class="player2-goal">Blue: Connect Left to Right</div>
         </div>
 
         <div class="turn-indicator" id="turn-indicator">
             <div class="loading"></div>
-            Loading game...
+            Loading game state...
         </div>
 
         <div class="timer-display" id="timer-display" style="display: none;">
-            <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">
-                Time remaining: <span id="timer-countdown">20</span>s
+            <div class="timer-text">
+                Time remaining: <span id="timer-countdown">30</span>s
             </div>
-            <div style="width: 100%; height: 10px; background: #ddd; border-radius: 5px; overflow: hidden;">
-                <div id="timer-bar" style="height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); width: 100%; transition: width 0.1s linear;"></div>
+            <div class="timer-bar-container">
+                <div id="timer-bar" class="timer-bar"></div>
             </div>
+        </div>
+
+        <div class="connection-hint">
+            <strong>Your color:</strong> <span id="your-color">Loading...</span>
         </div>
 
         <div class="game-board">
             <svg width="500" height="500" id="game-svg">
-                <!-- Voronoi cells will be rendered here from backend data -->
+                <!-- Voronoi cells will be rendered here -->
             </svg>
         </div>
 
         <div class="status-message waiting" id="status-message">
-            Connecting to game...
+            Connecting to game server...
         </div>
 
         <div class="action-buttons">
-            <button id="refresh-game" onclick="refreshGame()">Refresh</button>
-            <button class="back-to-dashboard" onclick="goToDashboard()">Back to Dashboard</button>
+            <button id="refresh-button" class="refresh-button" onclick="refreshGame()">
+                Refresh Game
+            </button>
+            <button id="forfeit-button" class="forfeit-button" onclick="showForfeitConfirm()" style="display: none;">
+                Forfeit Game
+            </button>
+            <button class="dashboard-button" onclick="goToDashboard()">
+                Back to Dashboard
+            </button>
         </div>
     </div>
 
@@ -304,136 +473,14 @@
         let gameInterval = null;
         let timerInterval = null;
         let voronoiCells = [];
-        let adjacencyMap = {};
-        let edgeCells = {};
 
-        // Check authentication
+        // Check authentication and game ID
         if (!token || !gameId) {
             alert('Invalid game session. Redirecting to dashboard.');
             window.location.href = 'dashboard.html';
         }
 
-        // Use board layout from backend instead of generating our own
-        function renderVoronoiBoard() {
-            const svg = document.getElementById('game-svg');
-            svg.innerHTML = '';
-            
-            // Wait for board layout from backend
-            if (!gameData.boardLayout || !gameData.boardLayout.cells || gameData.boardLayout.cells.length === 0) {
-                console.log('Waiting for board layout from backend...');
-                return;
-            }
-            
-            voronoiCells = gameData.boardLayout.cells;
-            adjacencyMap = {};
-            
-            // Convert adjacency map from backend format
-            if (gameData.boardLayout.adjacencyMap) {
-                for (const [key, value] of Object.entries(gameData.boardLayout.adjacencyMap)) {
-                    adjacencyMap[key] = value;
-                }
-            }
-            
-            edgeCells = gameData.boardLayout.edgeCells || {};
-            
-            console.log(`Rendering ${voronoiCells.length} cells from backend`);
-            
-            // Render each cell
-            voronoiCells.forEach((cell, index) => {
-                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                
-                const points = cell.vertices.map(v => `${v.x},${v.y}`).join(' ');
-                polygon.setAttribute('points', points);
-                polygon.setAttribute('class', 'voronoi-cell');
-                polygon.setAttribute('data-cell-id', index);
-                
-                // Apply player colors based on game state
-                if (gameData.board && gameData.board[index]) {
-                    polygon.classList.add(gameData.board[index] === 'X' ? 'player1' : 'player2');
-                    polygon.classList.add('claimed');
-                }
-                
-                // Disable clicks if not player's turn or game not in progress
-                if (!gameData.isYourTurn || gameData.status !== 'in_progress' || (gameData.board && gameData.board[index] !== '')) {
-                    polygon.classList.add('disabled');
-                }
-                
-                // Add click handler
-                polygon.addEventListener('click', () => makeMove(index));
-                
-                svg.appendChild(polygon);
-            });
-            
-            // Add visual indicators for edge cells
-            addEdgeIndicators();
-        }
-
-        function addEdgeIndicators() {
-            const svg = document.getElementById('game-svg');
-            
-            // Add subtle edge indicators
-            if (edgeCells.top) {
-                edgeCells.top.forEach(cellIndex => {
-                    const cell = voronoiCells[cellIndex];
-                    if (cell && !gameData.board[cellIndex]) {
-                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        circle.setAttribute('cx', cell.center.x);
-                        circle.setAttribute('cy', cell.center.y - 15);
-                        circle.setAttribute('r', 3);
-                        circle.setAttribute('fill', '#e74c3c');
-                        circle.setAttribute('opacity', '0.5');
-                        svg.appendChild(circle);
-                    }
-                });
-            }
-            
-            if (edgeCells.bottom) {
-                edgeCells.bottom.forEach(cellIndex => {
-                    const cell = voronoiCells[cellIndex];
-                    if (cell && !gameData.board[cellIndex]) {
-                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        circle.setAttribute('cx', cell.center.x);
-                        circle.setAttribute('cy', cell.center.y + 15);
-                        circle.setAttribute('r', 3);
-                        circle.setAttribute('fill', '#e74c3c');
-                        circle.setAttribute('opacity', '0.5');
-                        svg.appendChild(circle);
-                    }
-                });
-            }
-            
-            if (edgeCells.left) {
-                edgeCells.left.forEach(cellIndex => {
-                    const cell = voronoiCells[cellIndex];
-                    if (cell && !gameData.board[cellIndex]) {
-                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        circle.setAttribute('cx', cell.center.x - 15);
-                        circle.setAttribute('cy', cell.center.y);
-                        circle.setAttribute('r', 3);
-                        circle.setAttribute('fill', '#3498db');
-                        circle.setAttribute('opacity', '0.5');
-                        svg.appendChild(circle);
-                    }
-                });
-            }
-            
-            if (edgeCells.right) {
-                edgeCells.right.forEach(cellIndex => {
-                    const cell = voronoiCells[cellIndex];
-                    if (cell && !gameData.board[cellIndex]) {
-                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        circle.setAttribute('cx', cell.center.x + 15);
-                        circle.setAttribute('cy', cell.center.y);
-                        circle.setAttribute('r', 3);
-                        circle.setAttribute('fill', '#3498db');
-                        circle.setAttribute('opacity', '0.5');
-                        svg.appendChild(circle);
-                    }
-                });
-            }
-        }
-
-        // Initialize game
+        // Initialize game on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadGame();
             startGamePolling();
@@ -446,32 +493,155 @@
                 });
                 
                 if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        alert('Session expired. Please login again.');
+                        localStorage.removeItem('token');
+                        window.location.href = 'index.html';
+                        return;
+                    }
                     throw new Error('Failed to load game');
                 }
                 
                 const data = await response.json();
                 gameData = data;
                 updateGameDisplay();
+                
             } catch (error) {
                 console.error('Load game error:', error);
-                document.getElementById('status-message').textContent = 'Failed to load game. Please refresh.';
-                document.getElementById('status-message').className = 'status-message error';
+                showStatusMessage('Failed to load game. Please refresh the page.', 'error');
             }
         }
 
         function updateGameDisplay() {
-            // Update player names
+            // Update player information
             document.getElementById('player1-name').textContent = gameData.player1 || 'Loading...';
             document.getElementById('player2-name').textContent = gameData.player2 || 'Waiting for opponent...';
-            document.getElementById('your-color').textContent = gameData.yourSymbol === 'X' ? 'Red (Top↓Bottom)' : 'Blue (Left→Right)';
             
-            // Render board with backend layout
+            // Update your color display
+            const yourColorText = gameData.yourSymbol === 'X' ? 
+                'Red (Connect Top ↕ Bottom)' : 
+                'Blue (Connect Left ↔ Right)';
+            document.getElementById('your-color').textContent = yourColorText;
+            
+            // Update move count
+            document.getElementById('move-count').textContent = `Moves: ${gameData.moveCount || 0}`;
+            
+            // Render the game board
             renderVoronoiBoard();
             
             // Update turn indicator and status
             updateTurnIndicator();
             updateGameStatus();
             updateTimer();
+            
+            // Show forfeit button during active game
+            const forfeitButton = document.getElementById('forfeit-button');
+            forfeitButton.style.display = gameData.status === 'in_progress' ? 'inline-block' : 'none';
+        }
+
+        function renderVoronoiBoard() {
+            const svg = document.getElementById('game-svg');
+            svg.innerHTML = '';
+            
+            // Wait for board layout from backend
+            if (!gameData.boardLayout || !gameData.boardLayout.cells || gameData.boardLayout.cells.length === 0) {
+                console.log('Waiting for board layout from backend...');
+                return;
+            }
+            
+            voronoiCells = gameData.boardLayout.cells;
+            const edgeCells = gameData.boardLayout.edgeCells || {};
+            
+            console.log(`Rendering ${voronoiCells.length} cells from backend`);
+            
+            // Render each Voronoi cell
+            voronoiCells.forEach((cell, index) => {
+                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                
+                const points = cell.vertices.map(v => `${v.x},${v.y}`).join(' ');
+                polygon.setAttribute('points', points);
+                polygon.setAttribute('class', 'voronoi-cell');
+                polygon.setAttribute('data-cell-id', index);
+                
+                // Apply player colors based on current game state
+                if (gameData.board && gameData.board[index]) {
+                    const isPlayer1Cell = gameData.board[index] === 'X';
+                    polygon.classList.add(isPlayer1Cell ? 'player1' : 'player2');
+                    polygon.classList.add('claimed');
+                }
+                
+                // Disable clicks if not player's turn or game not active
+                const isDisabled = !gameData.isYourTurn || 
+                                  gameData.status !== 'in_progress' || 
+                                  (gameData.board && gameData.board[index] !== '');
+                
+                if (isDisabled) {
+                    polygon.classList.add('disabled');
+                } else {
+                    // Add visual hint for current player's symbol
+                    polygon.classList.add('your-symbol');
+                }
+                
+                // Add click handler for valid moves
+                polygon.addEventListener('click', () => {
+                    if (!isDisabled) {
+                        makeMove(index);
+                    }
+                });
+                
+                svg.appendChild(polygon);
+            });
+            
+            // Add edge indicators
+            addEdgeIndicators(svg, edgeCells);
+        }
+
+        function addEdgeIndicators(svg, edgeCells) {
+            // Add subtle indicators for edge cells to help players understand the goals
+            const addEdgeMarkers = (cellIndices, color, offsetX, offsetY) => {
+                cellIndices.forEach(cellIndex => {
+                    const cell = voronoiCells[cellIndex];
+                    if (cell && (!gameData.board || !gameData.board[cellIndex])) {
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', cell.center.x + offsetX);
+                        circle.setAttribute('cy', cell.center.y + offsetY);
+                        circle.setAttribute('r', 4);
+                        circle.setAttribute('fill', color);
+                        circle.setAttribute('opacity', '0.6');
+                        circle.setAttribute('class', 'edge-indicator');
+                        svg.appendChild(circle);
+                    }
+                });
+            };
+            
+            // Red indicators for top/bottom (Player 1 goal)
+            if (edgeCells.top) addEdgeMarkers(edgeCells.top, '#e74c3c', 0, -12);
+            if (edgeCells.bottom) addEdgeMarkers(edgeCells.bottom, '#e74c3c', 0, 12);
+            
+            // Blue indicators for left/right (Player 2 goal)
+            if (edgeCells.left) addEdgeMarkers(edgeCells.left, '#3498db', -12, 0);
+            if (edgeCells.right) addEdgeMarkers(edgeCells.right, '#3498db', 12, 0);
+        }
+
+        function updateTurnIndicator() {
+            const indicator = document.getElementById('turn-indicator');
+            
+            if (gameData.status === 'queued') {
+                indicator.innerHTML = '<div class="loading"></div>Waiting for opponent to join...';
+                indicator.className = 'turn-indicator waiting';
+            } else if (gameData.status === 'in_progress') {
+                if (gameData.isYourTurn) {
+                    const symbolText = gameData.yourSymbol === 'X' ? 'Red' : 'Blue';
+                    indicator.innerHTML = `Your Turn! (${symbolText} Player)`;
+                    indicator.className = 'turn-indicator your-turn';
+                } else {
+                    indicator.innerHTML = `${gameData.currentPlayer}'s Turn...`;
+                    indicator.className = 'turn-indicator opponent-turn';
+                }
+            } else if (gameData.status === 'completed') {
+                indicator.innerHTML = 'Game Over';
+                indicator.className = 'turn-indicator game-over-indicator';
+            }
         }
 
         function updateTimer() {
@@ -485,12 +655,13 @@
                 timerInterval = null;
             }
             
-            if (gameData.status === 'in_progress' && gameData.timeRemaining !== null) {
+            if (gameData.status === 'in_progress' && gameData.timeRemaining !== null && gameData.timeRemaining !== undefined) {
                 timerDisplay.style.display = 'block';
                 
                 let remainingMs = gameData.timeRemaining;
+                const totalTime = 30000; // 30 seconds total
                 
-                // Update timer every 100ms for smooth countdown
+                // Update timer every 100ms for smooth animation
                 timerInterval = setInterval(() => {
                     remainingMs -= 100;
                     
@@ -501,23 +672,23 @@
                         timerBar.style.width = '0%';
                         
                         // Force refresh to get timeout result
-                        loadGame();
+                        setTimeout(() => loadGame(), 1000);
                         return;
                     }
                     
                     const seconds = Math.ceil(remainingMs / 1000);
-                    const percentage = (remainingMs / 20000) * 100;
+                    const percentage = (remainingMs / totalTime) * 100;
                     
                     timerCountdown.textContent = seconds;
-                    timerBar.style.width = percentage + '%';
+                    timerBar.style.width = Math.max(0, percentage) + '%';
                     
-                    // Change color as time runs out
-                    if (percentage > 50) {
+                    // Change color scheme as time runs out
+                    if (percentage > 60) {
                         timerBar.style.background = '#28a745';
-                    } else if (percentage > 25) {
-                        timerBar.style.background = '#ffc107';
+                    } else if (percentage > 30) {
+                        timerBar.style.background = 'linear-gradient(90deg, #28a745, #ffc107)';
                     } else {
-                        timerBar.style.background = '#dc3545';
+                        timerBar.style.background = 'linear-gradient(90deg, #ffc107, #dc3545)';
                     }
                 }, 100);
             } else {
@@ -525,42 +696,20 @@
             }
         }
 
-        function updateTurnIndicator() {
-            const indicator = document.getElementById('turn-indicator');
-            
-            if (gameData.status === 'queued') {
-                indicator.innerHTML = '<div class="loading"></div>Waiting for opponent...';
-                indicator.className = 'turn-indicator waiting';
-            } else if (gameData.status === 'in_progress') {
-                if (gameData.isYourTurn) {
-                    indicator.textContent = `Your turn! (${gameData.yourSymbol === 'X' ? 'Red' : 'Blue'})`;
-                    indicator.className = 'turn-indicator your-turn';
-                } else {
-                    indicator.textContent = `${gameData.currentPlayer}'s turn...`;
-                    indicator.className = 'turn-indicator opponent-turn';
-                }
-            } else if (gameData.status === 'completed') {
-                indicator.textContent = 'Game Over';
-                indicator.className = 'turn-indicator game-over';
-            }
-        }
-
         function updateGameStatus() {
-            const statusElement = document.getElementById('status-message');
+            if (gameData.status === 'completed') {
+                showGameResult();
+                return;
+            }
             
             if (gameData.status === 'queued') {
-                statusElement.textContent = 'Waiting for opponent to join...';
-                statusElement.className = 'status-message waiting';
+                showStatusMessage('Waiting for opponent to join the game...', 'waiting');
             } else if (gameData.status === 'in_progress') {
                 if (gameData.isYourTurn) {
-                    statusElement.textContent = 'Your turn! Click on an empty cell to claim it.';
-                    statusElement.className = 'status-message success';
+                    showStatusMessage('Your turn! Click on an empty cell to claim it.', 'success');
                 } else {
-                    statusElement.textContent = 'Waiting for opponent\'s move...';
-                    statusElement.className = 'status-message waiting';
+                    showStatusMessage(`Waiting for ${gameData.currentPlayer}'s move...`, 'waiting');
                 }
-            } else if (gameData.status === 'completed') {
-                showGameResult();
             }
         }
 
@@ -573,22 +722,33 @@
             
             if (gameData.winner === currentUser) {
                 resultClass = 'winner';
-                resultText = 'Congratulations! You connected your sides and won 19.5 TRX!';
+                resultText = '🎉 Victory! You connected your sides and won 19.5 TRX! 🎉';
             } else if (gameData.winner && gameData.winner !== currentUser) {
                 resultClass = 'loser';
-                resultText = 'You lost this round. Your opponent connected their sides first.';
+                resultText = '😞 Defeat! Your opponent connected their sides first.';
             } else {
-                resultClass = 'draw';
-                resultText = 'Draw! The last player to move loses. Your stakes have been handled accordingly.';
+                resultClass = 'draw-result';
+                resultText = '📍 Draw! The board filled without a winner. Last player to move loses.';
             }
             
             statusElement.innerHTML = `<div class="game-result ${resultClass}">${resultText}</div>`;
             
-            // Stop polling
+            // Stop polling when game is over
             if (gameInterval) {
                 clearInterval(gameInterval);
                 gameInterval = null;
             }
+            
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function showStatusMessage(message, type) {
+            const statusElement = document.getElementById('status-message');
+            statusElement.textContent = message;
+            statusElement.className = `status-message ${type}`;
         }
 
         async function makeMove(position) {
@@ -599,6 +759,13 @@
             // Check if cell is already claimed
             if (gameData.board && gameData.board[position] !== '') {
                 return;
+            }
+            
+            // Provide immediate visual feedback
+            const cellElement = document.querySelector(`[data-cell-id="${position}"]`);
+            if (cellElement) {
+                cellElement.style.opacity = '0.7';
+                cellElement.style.pointerEvents = 'none';
             }
             
             try {
@@ -618,31 +785,44 @@
                 
                 const data = await response.json();
                 
-                // Update game data with response
+                // Update local game data
                 gameData.board = data.board;
                 gameData.status = data.status;
                 gameData.isYourTurn = data.isYourTurn;
+                gameData.moveCount = data.moveCount;
                 
                 if (data.winner) {
                     if (data.winner === 'draw') {
-                        gameData.winner = null;
+                        gameData.winner = null; // Handle draw case
                     } else {
+                        // Determine winner name based on symbol
                         gameData.winner = data.winner === gameData.yourSymbol ? 
                             localStorage.getItem('username') : 
                             (gameData.yourSymbol === 'X' ? gameData.player2 : gameData.player1);
                     }
                 }
                 
+                // Refresh display immediately
                 updateGameDisplay();
                 
             } catch (error) {
                 console.error('Move error:', error);
-                alert('Failed to make move: ' + error.message);
+                
+                // Restore cell appearance on error
+                if (cellElement) {
+                    cellElement.style.opacity = '';
+                    cellElement.style.pointerEvents = '';
+                }
+                
+                showStatusMessage('Failed to make move: ' + error.message, 'error');
+                
+                // Refresh game state after error
+                setTimeout(() => loadGame(), 1000);
             }
         }
 
         function startGamePolling() {
-            // Poll every 2 seconds for game updates
+            // Poll every 3 seconds for game updates (when game is active)
             gameInterval = setInterval(() => {
                 if (gameData.status !== 'completed') {
                     loadGame();
@@ -650,11 +830,48 @@
                     clearInterval(gameInterval);
                     gameInterval = null;
                 }
-            }, 2000);
+            }, 3000);
         }
 
         function refreshGame() {
-            loadGame();
+            const button = document.getElementById('refresh-button');
+            button.disabled = true;
+            button.innerHTML = '<div class="loading"></div>Refreshing...';
+            
+            loadGame().finally(() => {
+                button.disabled = false;
+                button.innerHTML = 'Refresh Game';
+            });
+        }
+
+        function showForfeitConfirm() {
+            const shouldForfeit = confirm('Are you sure you want to forfeit? You will lose the game and your 10 TRX stake.');
+            if (shouldForfeit) {
+                forfeitGame();
+            }
+        }
+
+        async function forfeitGame() {
+            try {
+                const response = await fetch(`${API_URL}/game/${gameId}/forfeit`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    showStatusMessage('Game forfeited. Redirecting to dashboard...', 'error');
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 2000);
+                } else {
+                    throw new Error('Failed to forfeit game');
+                }
+            } catch (error) {
+                console.error('Failed to forfeit game:', error);
+                showStatusMessage('Failed to forfeit game. Please try again.', 'error');
+            }
         }
 
         function goToDashboard() {
@@ -668,13 +885,14 @@
                 timerInterval = null;
             }
             
-            // Forfeit the game if it's in progress
+            // Warn user if leaving during active game
             if (gameData.status === 'in_progress') {
-                const shouldForfeit = confirm('Leaving will forfeit the game and you will lose. Are you sure?');
-                if (!shouldForfeit) {
+                const shouldLeave = confirm('Leaving will forfeit the game and you will lose your 10 TRX stake. Are you sure?');
+                if (!shouldLeave) {
                     return;
                 }
                 
+                // Forfeit and then redirect
                 forfeitGame().then(() => {
                     window.location.href = 'dashboard.html';
                 });
@@ -683,35 +901,57 @@
             }
         }
 
-        async function forfeitGame() {
-            try {
-                await fetch(`${API_URL}/game/${gameId}/forfeit`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-            } catch (error) {
-                console.error('Failed to forfeit game:', error);
+        // Handle page visibility changes (pause polling when tab is hidden)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (gameInterval) {
+                    clearInterval(gameInterval);
+                    gameInterval = null;
+                }
+            } else if (gameData.status !== 'completed') {
+                // Resume polling when tab becomes visible
+                if (!gameInterval) {
+                    startGamePolling();
+                }
+                // Refresh immediately when returning to tab
+                loadGame();
             }
-        }
+        });
 
-        // Handle page close/refresh
+        // Handle page close/refresh with forfeit warning
         window.addEventListener('beforeunload', (e) => {
             if (gameData.status === 'in_progress') {
                 e.preventDefault();
-                e.returnValue = 'Leaving will forfeit the game and you will lose. Are you sure?';
+                e.returnValue = 'Leaving will forfeit the game and you will lose your 10 TRX stake. Are you sure?';
                 
-                navigator.sendBeacon(`${API_URL}/game/${gameId}/forfeit`, JSON.stringify({}));
+                // Send forfeit beacon (best effort)
+                if (navigator.sendBeacon) {
+                    const formData = new FormData();
+                    formData.append('gameId', gameId);
+                    navigator.sendBeacon(`${API_URL}/game/${gameId}/forfeit`, formData);
+                }
             }
             
+            // Cleanup intervals
             if (gameInterval) {
                 clearInterval(gameInterval);
+                gameInterval = null;
             }
             
             if (timerInterval) {
                 clearInterval(timerInterval);
+                timerInterval = null;
             }
+        });
+
+        // Handle connection errors gracefully
+        window.addEventListener('online', () => {
+            showStatusMessage('Connection restored. Refreshing game...', 'success');
+            loadGame();
+        });
+
+        window.addEventListener('offline', () => {
+            showStatusMessage('Connection lost. Game will resume when online.', 'error');
         });
     </script>
 </body>
