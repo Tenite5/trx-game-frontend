@@ -194,39 +194,81 @@
             width: 500px;
             height: 500px;
             margin: 20px auto;
-            border: 3px solid #333;
             border-radius: 15px;
             background: #ffffff;
             box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        /* Border edges colored based on player goals */
+        .game-board::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #e74c3c;
+            z-index: 10;
+        }
+
+        .game-board::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #e74c3c;
+            z-index: 10;
+        }
+
+        .game-board-left {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: #3498db;
+            z-index: 10;
+        }
+
+        .game-board-right {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 4px;
+            height: 100%;
+            background: #3498db;
+            z-index: 10;
         }
 
         .voronoi-cell {
             cursor: pointer;
             transition: all 0.15s ease;
             stroke: #333;
-            stroke-width: 2;
+            stroke-width: 1;
             fill: #f8f9fa;
         }
 
         .voronoi-cell:hover:not(.claimed):not(.disabled) {
             fill: #e9ecef;
-            stroke-width: 3;
+            stroke-width: 2;
             filter: drop-shadow(0 0 8px rgba(0, 123, 255, 0.4));
-            transform: scale(1.02);
         }
 
         .voronoi-cell.player1 {
             fill: #e74c3c;
             opacity: 0.9;
             stroke: #c0392b;
-            stroke-width: 2.5;
+            stroke-width: 2;
         }
 
         .voronoi-cell.player2 {
             fill: #3498db;
             opacity: 0.9;
             stroke: #2980b9;
-            stroke-width: 2.5;
+            stroke-width: 2;
         }
 
         .voronoi-cell.disabled {
@@ -246,13 +288,8 @@
 
         @keyframes optimisticPulse {
             0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
+            50% { transform: scale(1.05); opacity: 0.7; }
             100% { transform: scale(1); opacity: 0.6; }
-        }
-
-        .edge-indicator {
-            opacity: 0.6;
-            pointer-events: none;
         }
 
         .move-animation {
@@ -462,7 +499,7 @@
             <div class="player-info">
                 <h3>Player 1 (Red)</h3>
                 <p id="player1-name">Loading...</p>
-                <p>Goal: Top ↕ Bottom</p>
+                <p>Goal: Top ↔ Bottom</p>
             </div>
             <div class="game-stats">
                 <p>Stake: 10 TRX</p>
@@ -500,6 +537,10 @@
         </div>
 
         <div class="game-board">
+            <!-- Colored edges for visual indication -->
+            <div class="game-board-left"></div>
+            <div class="game-board-right"></div>
+            
             <svg width="500" height="500" id="game-svg">
                 <!-- Voronoi cells will be rendered here -->
             </svg>
@@ -536,6 +577,7 @@
         let lastMovePosition = null;
         let optimisticMoves = new Set(); // Track optimistic moves
         let currentTimer = null;
+        let lastTimerUpdate = null;
 
         // Client-side move validation
         const GameValidator = {
@@ -616,13 +658,15 @@
                 updateMoveCount();
                 
                 // Start timer for next turn
-                if (data.timeRemaining) {
+                if (data.timeRemaining !== undefined) {
                     startClientTimer(data.timeRemaining);
                 }
             });
 
             socket.on('timer-update', (data) => {
-                updateTimerDisplay(data.timeRemaining);
+                if (data.timeRemaining !== undefined) {
+                    updateTimerDisplay(data.timeRemaining);
+                }
             });
 
             socket.on('game-ended', (data) => {
@@ -637,8 +681,9 @@
                 console.error('Move error:', data.message);
                 showStatusMessage('Move failed: ' + data.message, 'error');
                 
-                // Revert optimistic move if needed
-                // This will be handled by the next game-state update
+                // Clear optimistic moves and refresh game state
+                optimisticMoves.clear();
+                socket.emit('join-game', gameId);
             });
 
             socket.on('error', (data) => {
@@ -695,7 +740,7 @@
             return true;
         }
 
-        // Timer management
+        // Improved timer management
         function startClientTimer(timeRemaining) {
             stopClientTimer();
             
@@ -703,34 +748,47 @@
             const timerCountdown = document.getElementById('timer-countdown');
             const timerBar = document.getElementById('timer-bar');
             
+            if (!timerDisplay || !timerCountdown || !timerBar) return;
+            
             timerDisplay.style.display = 'block';
             
-            let remaining = timeRemaining;
+            let remaining = Math.max(0, timeRemaining);
             const totalTime = 30000;
+            lastTimerUpdate = Date.now();
             
+            // Update immediately
+            updateTimerUI(remaining, totalTime, timerCountdown, timerBar);
+            
+            // Start smooth countdown
             currentTimer = setInterval(() => {
-                remaining -= 50;
+                const now = Date.now();
+                const elapsed = now - lastTimerUpdate;
+                remaining = Math.max(0, remaining - elapsed);
+                lastTimerUpdate = now;
+                
+                updateTimerUI(remaining, totalTime, timerCountdown, timerBar);
                 
                 if (remaining <= 0) {
                     stopClientTimer();
-                    return;
-                }
-                
-                const seconds = Math.ceil(remaining / 1000);
-                const percentage = (remaining / totalTime) * 100;
-                
-                timerCountdown.textContent = seconds;
-                timerBar.style.width = Math.max(0, percentage) + '%';
-                
-                // Color changes based on time remaining
-                if (percentage > 60) {
-                    timerBar.style.background = '#28a745';
-                } else if (percentage > 30) {
-                    timerBar.style.background = 'linear-gradient(90deg, #28a745, #ffc107)';
-                } else {
-                    timerBar.style.background = 'linear-gradient(90deg, #ffc107, #dc3545)';
                 }
             }, 50); // Update every 50ms for ultra-smooth timer
+        }
+
+        function updateTimerUI(remaining, totalTime, timerCountdown, timerBar) {
+            const seconds = Math.ceil(remaining / 1000);
+            const percentage = Math.max(0, (remaining / totalTime) * 100);
+            
+            timerCountdown.textContent = seconds;
+            timerBar.style.width = percentage + '%';
+            
+            // Color changes based on time remaining
+            if (percentage > 60) {
+                timerBar.style.background = '#28a745';
+            } else if (percentage > 30) {
+                timerBar.style.background = 'linear-gradient(90deg, #28a745, #ffc107)';
+            } else {
+                timerBar.style.background = 'linear-gradient(90deg, #ffc107, #dc3545)';
+            }
         }
 
         function stopClientTimer() {
@@ -740,7 +798,9 @@
             }
             
             const timerDisplay = document.getElementById('timer-display');
-            timerDisplay.style.display = 'none';
+            if (timerDisplay) {
+                timerDisplay.style.display = 'none';
+            }
         }
 
         function updateTimerDisplay(timeRemaining) {
@@ -749,14 +809,15 @@
                 return;
             }
             
+            // Sync with server timer
+            lastTimerUpdate = Date.now();
+            
             const timerCountdown = document.getElementById('timer-countdown');
             const timerBar = document.getElementById('timer-bar');
             
-            const seconds = Math.ceil(timeRemaining / 1000);
-            const percentage = (timeRemaining / 30000) * 100;
-            
-            if (timerCountdown) timerCountdown.textContent = seconds;
-            if (timerBar) timerBar.style.width = Math.max(0, percentage) + '%';
+            if (timerCountdown && timerBar) {
+                updateTimerUI(timeRemaining, 30000, timerCountdown, timerBar);
+            }
         }
 
         function updateGameDisplay() {
@@ -771,27 +832,38 @@
             }
             
             const forfeitButton = document.getElementById('forfeit-button');
-            forfeitButton.style.display = gameData.status === 'in_progress' ? 'inline-block' : 'none';
+            if (forfeitButton) {
+                forfeitButton.style.display = gameData.status === 'in_progress' ? 'inline-block' : 'none';
+            }
         }
 
         function updatePlayerInfo() {
-            document.getElementById('player1-name').textContent = gameData.player1 || 'Loading...';
-            document.getElementById('player2-name').textContent = gameData.player2 || 'Waiting for opponent...';
+            const player1Element = document.getElementById('player1-name');
+            const player2Element = document.getElementById('player2-name');
+            const yourColorElement = document.getElementById('your-color');
             
-            const yourColorText = gameData.yourSymbol === 'X' ? 
-                'Red (Connect Top ↕ Bottom)' : 
-                'Blue (Connect Left ↔ Right)';
-            document.getElementById('your-color').textContent = yourColorText;
+            if (player1Element) player1Element.textContent = gameData.player1 || 'Loading...';
+            if (player2Element) player2Element.textContent = gameData.player2 || 'Waiting for opponent...';
+            
+            if (yourColorElement) {
+                const yourColorText = gameData.yourSymbol === 'X' ? 
+                    'Red (Connect Top ↔ Bottom)' : 
+                    'Blue (Connect Left ↔ Right)';
+                yourColorElement.textContent = yourColorText;
+            }
         }
 
         function updateMoveCount() {
-            document.getElementById('move-count').textContent = `Moves: ${gameData.moveCount || 0}`;
+            const moveCountElement = document.getElementById('move-count');
+            if (moveCountElement) {
+                moveCountElement.textContent = `Moves: ${gameData.moveCount || 0}`;
+            }
         }
 
         function renderVoronoiBoard() {
             const svg = document.getElementById('game-svg');
             
-            if (!gameData.boardLayout || !gameData.boardLayout.cells || gameData.boardLayout.cells.length === 0) {
+            if (!svg || !gameData.boardLayout || !gameData.boardLayout.cells || gameData.boardLayout.cells.length === 0) {
                 return;
             }
             
@@ -808,7 +880,7 @@
 
         function createBoardElements() {
             const svg = document.getElementById('game-svg');
-            const edgeCells = gameData.boardLayout.edgeCells || {};
+            if (!svg) return;
             
             voronoiCells.forEach((cell, index) => {
                 const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
@@ -839,7 +911,6 @@
                 svg.appendChild(polygon);
             });
             
-            addEdgeIndicators(svg, edgeCells);
             updateCellStates(); // Apply current game state
         }
 
@@ -888,31 +959,9 @@
             }
         }
 
-        function addEdgeIndicators(svg, edgeCells) {
-            const addEdgeMarkers = (cellIndices, color, offsetX, offsetY) => {
-                cellIndices.forEach(cellIndex => {
-                    const cell = voronoiCells[cellIndex];
-                    if (cell && (!gameData.board || !gameData.board[cellIndex])) {
-                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        circle.setAttribute('cx', cell.center.x + offsetX);
-                        circle.setAttribute('cy', cell.center.y + offsetY);
-                        circle.setAttribute('r', 4);
-                        circle.setAttribute('fill', color);
-                        circle.setAttribute('opacity', '0.6');
-                        circle.setAttribute('class', 'edge-indicator');
-                        svg.appendChild(circle);
-                    }
-                });
-            };
-            
-            if (edgeCells.top) addEdgeMarkers(edgeCells.top, '#e74c3c', 0, -12);
-            if (edgeCells.bottom) addEdgeMarkers(edgeCells.bottom, '#e74c3c', 0, 12);
-            if (edgeCells.left) addEdgeMarkers(edgeCells.left, '#3498db', -12, 0);
-            if (edgeCells.right) addEdgeMarkers(edgeCells.right, '#3498db', 12, 0);
-        }
-
         function updateTurnIndicator() {
             const indicator = document.getElementById('turn-indicator');
+            if (!indicator) return;
             
             if (gameData.status === 'queued') {
                 indicator.innerHTML = '<div class="loading"></div>Waiting for opponent to join...';
@@ -950,6 +999,8 @@
 
         function showGameResult(reason = 'connection') {
             const statusElement = document.getElementById('status-message');
+            if (!statusElement) return;
+            
             const currentUser = username;
             
             let resultClass = '';
@@ -984,6 +1035,8 @@
 
         function showStatusMessage(message, type) {
             const statusElement = document.getElementById('status-message');
+            if (!statusElement) return;
+            
             statusElement.textContent = message;
             statusElement.className = `status-message ${type}`;
         }
@@ -998,7 +1051,9 @@
         async function forfeitGame() {
             try {
                 // Send forfeit via WebSocket for immediate response
-                socket.emit('forfeit-game', { gameId });
+                if (socket && socket.connected) {
+                    socket.emit('forfeit-game', { gameId });
+                }
                 
                 // Also send HTTP request as backup
                 const response = await fetch(`${API_URL}/game/${gameId}/forfeit`, {
