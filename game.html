@@ -578,7 +578,6 @@
         let optimisticMoves = new Set(); // Track optimistic moves
         let currentTimer = null;
         let lastTimerUpdate = null;
-        let lastServerTime = null;
 
         // Client-side move validation
         const GameValidator = {
@@ -666,8 +665,7 @@
 
             socket.on('timer-update', (data) => {
                 if (data.timeRemaining !== undefined) {
-                    lastServerTime = data.timeRemaining;
-                    // Client timer will update on next animation frame
+                    updateTimerDisplay(data.timeRemaining);
                 }
             });
 
@@ -754,48 +752,31 @@
             
             timerDisplay.style.display = 'block';
             
-            lastServerTime = timeRemaining;
+            let remaining = Math.max(0, timeRemaining);
+            const totalTime = 30000;
             lastTimerUpdate = Date.now();
             
             // Update immediately
-            updateTimerUI(lastServerTime, timerCountdown, timerBar);
+            updateTimerUI(remaining, totalTime, timerCountdown, timerBar);
             
-            // Start smooth countdown using requestAnimationFrame
-            function updateTimer() {
+            // Start smooth countdown
+            currentTimer = setInterval(() => {
                 const now = Date.now();
                 const elapsed = now - lastTimerUpdate;
+                remaining = Math.max(0, remaining - elapsed);
+                lastTimerUpdate = now;
                 
-                // Use server time as base, subtract elapsed time
-                let remaining = Math.max(0, lastServerTime - elapsed);
+                updateTimerUI(remaining, totalTime, timerCountdown, timerBar);
                 
-                updateTimerUI(remaining, timerCountdown, timerBar);
-                
-                if (remaining > 0) {
-                    lastTimerUpdate = now;
-                    currentTimer = requestAnimationFrame(updateTimer);
-                } else {
+                if (remaining <= 0) {
                     stopClientTimer();
                 }
-            }
-            
-            currentTimer = requestAnimationFrame(updateTimer);
+            }, 50); // Update every 50ms for ultra-smooth timer
         }
 
-        function stopClientTimer() {
-            if (currentTimer) {
-                cancelAnimationFrame(currentTimer);
-                currentTimer = null;
-            }
-            
-            const timerDisplay = document.getElementById('timer-display');
-            if (timerDisplay) {
-                timerDisplay.style.display = 'none';
-            }
-        }
-
-        function updateTimerUI(remaining, timerCountdown, timerBar) {
+        function updateTimerUI(remaining, totalTime, timerCountdown, timerBar) {
             const seconds = Math.ceil(remaining / 1000);
-            const percentage = Math.max(0, (remaining / 30000) * 100);
+            const percentage = Math.max(0, (remaining / totalTime) * 100);
             
             timerCountdown.textContent = seconds;
             timerBar.style.width = percentage + '%';
@@ -807,6 +788,35 @@
                 timerBar.style.background = 'linear-gradient(90deg, #28a745, #ffc107)';
             } else {
                 timerBar.style.background = 'linear-gradient(90deg, #ffc107, #dc3545)';
+            }
+        }
+
+        function stopClientTimer() {
+            if (currentTimer) {
+                clearInterval(currentTimer);
+                currentTimer = null;
+            }
+            
+            const timerDisplay = document.getElementById('timer-display');
+            if (timerDisplay) {
+                timerDisplay.style.display = 'none';
+            }
+        }
+
+        function updateTimerDisplay(timeRemaining) {
+            if (timeRemaining <= 0) {
+                stopClientTimer();
+                return;
+            }
+            
+            // Sync with server timer
+            lastTimerUpdate = Date.now();
+            
+            const timerCountdown = document.getElementById('timer-countdown');
+            const timerBar = document.getElementById('timer-bar');
+            
+            if (timerCountdown && timerBar) {
+                updateTimerUI(timeRemaining, 30000, timerCountdown, timerBar);
             }
         }
 
@@ -862,4 +872,274 @@
                 svg.innerHTML = '';
                 voronoiCells = gameData.boardLayout.cells;
                 createBoardElements();
-            } else
+            } else {
+                // Just update cell states efficiently
+                updateCellStates();
+            }
+        }
+
+        function createBoardElements() {
+            const svg = document.getElementById('game-svg');
+            if (!svg) return;
+            
+            voronoiCells.forEach((cell, index) => {
+                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                
+                const points = cell.vertices.map(v => `${v.x},${v.y}`).join(' ');
+                polygon.setAttribute('points', points);
+                polygon.setAttribute('class', 'voronoi-cell');
+                polygon.setAttribute('data-cell-id', index);
+                
+                // Add hover preview for valid moves
+                polygon.addEventListener('mouseenter', () => {
+                    if (GameValidator.isValidMove(index, gameData.board, gameData.isYourTurn, gameData.status).valid) {
+                        polygon.style.fill = gameData.yourSymbol === 'X' ? 
+                            'rgba(231, 76, 60, 0.3)' : 'rgba(52, 152, 219, 0.3)';
+                    }
+                });
+
+                polygon.addEventListener('mouseleave', () => {
+                    if (!polygon.classList.contains('claimed')) {
+                        polygon.style.fill = '';
+                    }
+                });
+                
+                polygon.addEventListener('click', () => {
+                    makeOptimisticMove(index);
+                });
+                
+                svg.appendChild(polygon);
+            });
+            
+            updateCellStates(); // Apply current game state
+        }
+
+        function updateCellStates() {
+            voronoiCells.forEach((cell, index) => {
+                const polygon = document.querySelector(`[data-cell-id="${index}"]`);
+                if (!polygon) return;
+                
+                // Reset classes
+                polygon.className = 'voronoi-cell';
+                
+                // Apply current state
+                if (gameData.board && gameData.board[index]) {
+                    const isPlayer1Cell = gameData.board[index] === 'X';
+                    polygon.classList.add(isPlayer1Cell ? 'player1' : 'player2');
+                    polygon.classList.add('claimed');
+                    
+                    // Add animation for last move
+                    if (index === lastMovePosition) {
+                        polygon.classList.add('move-animation');
+                        setTimeout(() => polygon.classList.remove('move-animation'), 300);
+                    }
+                }
+                
+                // Check if move is valid for current player
+                const validation = GameValidator.isValidMove(index, gameData.board, gameData.isYourTurn, gameData.status);
+                if (!validation.valid) {
+                    polygon.classList.add('disabled');
+                } else {
+                    polygon.classList.add('your-symbol');
+                }
+            });
+        }
+
+        function updateCellDisplay(position, symbol, animated = false) {
+            const polygon = document.querySelector(`[data-cell-id="${position}"]`);
+            if (!polygon) return;
+            
+            polygon.classList.remove('optimistic');
+            polygon.classList.add('claimed');
+            polygon.classList.add(symbol === 'X' ? 'player1' : 'player2');
+            
+            if (animated) {
+                polygon.classList.add('move-animation');
+                setTimeout(() => polygon.classList.remove('move-animation'), 300);
+            }
+        }
+
+        function updateTurnIndicator() {
+            const indicator = document.getElementById('turn-indicator');
+            if (!indicator) return;
+            
+            if (gameData.status === 'queued') {
+                indicator.innerHTML = '<div class="loading"></div>Waiting for opponent to join...';
+                indicator.className = 'turn-indicator waiting';
+            } else if (gameData.status === 'in_progress') {
+                if (gameData.isYourTurn) {
+                    const symbolText = gameData.yourSymbol === 'X' ? 'Red' : 'Blue';
+                    indicator.innerHTML = `Your Turn! (${symbolText} Player)`;
+                    indicator.className = 'turn-indicator your-turn';
+                } else {
+                    indicator.innerHTML = `${gameData.currentPlayer}'s Turn...`;
+                    indicator.className = 'turn-indicator opponent-turn';
+                }
+            } else if (gameData.status === 'completed') {
+                indicator.innerHTML = 'Game Over';
+                indicator.className = 'turn-indicator game-over-indicator';
+            }
+        }
+
+        function updateGameStatus() {
+            if (gameData.status === 'completed') {
+                return; // showGameResult will handle this
+            }
+            
+            if (gameData.status === 'queued') {
+                showStatusMessage('Waiting for opponent to join the game...', 'waiting');
+            } else if (gameData.status === 'in_progress') {
+                if (gameData.isYourTurn) {
+                    showStatusMessage('Your turn! Click on an empty cell to claim it.', 'success');
+                } else {
+                    showStatusMessage(`Waiting for ${gameData.currentPlayer}'s move...`, 'waiting');
+                }
+            }
+        }
+
+        function showGameResult(reason = 'connection') {
+            const statusElement = document.getElementById('status-message');
+            if (!statusElement) return;
+            
+            const currentUser = username;
+            
+            let resultClass = '';
+            let resultText = '';
+            
+            if (gameData.winner === currentUser) {
+                resultClass = 'winner';
+                if (reason === 'timeout') {
+                    resultText = '🎉 Victory by Timeout! Your opponent ran out of time. You won 19.5 TRX! 🎉';
+                } else if (reason === 'forfeit') {
+                    resultText = '🎉 Victory by Forfeit! Your opponent gave up. You won 19.5 TRX! 🎉';
+                } else {
+                    resultText = '🎉 Victory! You connected your sides and won 19.5 TRX! 🎉';
+                }
+            } else if (gameData.winner && gameData.winner !== currentUser) {
+                resultClass = 'loser';
+                if (reason === 'timeout') {
+                    resultText = '⏰ Defeat by Timeout! You ran out of time.';
+                } else if (reason === 'forfeit') {
+                    resultText = '🏳️ You forfeited the game.';
+                } else {
+                    resultText = '😞 Defeat! Your opponent connected their sides first.';
+                }
+            } else {
+                resultClass = 'draw-result';
+                resultText = '🤝 Draw! The board filled without a winner. Last player to move loses.';
+            }
+            
+            statusElement.innerHTML = `<div class="game-result ${resultClass}">${resultText}</div>`;
+            stopClientTimer();
+        }
+
+        function showStatusMessage(message, type) {
+            const statusElement = document.getElementById('status-message');
+            if (!statusElement) return;
+            
+            statusElement.textContent = message;
+            statusElement.className = `status-message ${type}`;
+        }
+
+        function showForfeitConfirm() {
+            const shouldForfeit = confirm('Are you sure you want to forfeit? You will lose the game and your 10 TRX stake.');
+            if (shouldForfeit) {
+                forfeitGame();
+            }
+        }
+
+        async function forfeitGame() {
+            try {
+                // Send forfeit via WebSocket for immediate response
+                if (socket && socket.connected) {
+                    socket.emit('forfeit-game', { gameId });
+                }
+                
+                // Also send HTTP request as backup
+                const response = await fetch(`${API_URL}/game/${gameId}/forfeit`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    showStatusMessage('Game forfeited. Redirecting to dashboard...', 'error');
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Failed to forfeit game:', error);
+                showStatusMessage('Failed to forfeit game. Please try again.', 'error');
+            }
+        }
+
+        function goToDashboard() {
+            if (gameData.status === 'in_progress') {
+                const shouldLeave = confirm('Leaving will forfeit the game and you will lose your 10 TRX stake. Are you sure?');
+                if (!shouldLeave) return;
+                
+                forfeitGame().then(() => {
+                    window.location.href = 'dashboard.html';
+                });
+            } else {
+                if (socket) {
+                    socket.disconnect();
+                }
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && socket && !socket.connected) {
+                // Try to reconnect when tab becomes visible
+                socket.connect();
+            }
+        });
+
+        // Handle connection issues
+        window.addEventListener('online', () => {
+            if (socket && !socket.connected) {
+                socket.connect();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            showStatusMessage('You are offline. Game will resume when connection is restored.', 'error');
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', (e) => {
+            if (gameData.status === 'in_progress') {
+                e.preventDefault();
+                e.returnValue = 'Leaving will forfeit the game and you will lose your 10 TRX stake.';
+                
+                // Send forfeit signal
+                if (socket && socket.connected) {
+                    socket.emit('forfeit-game', { gameId });
+                }
+            }
+            
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            stopClientTimer();
+        });
+
+        // Initialize everything
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSocket();
+        });
+
+        // Keyboard shortcuts yeah
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'f' && gameData.status === 'in_progress') {
+                showForfeitConfirm();
+            } else if (e.key === 'r') {
+                location.reload();
+            }
+        });
+    </script>
+</body>
+</html>
